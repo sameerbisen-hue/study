@@ -1,0 +1,53 @@
+import { Link, useNavigate } from "react-router-dom";
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import AuthShell from "@/components/auth/AuthShell";
+import { toast } from "@/hooks/use-toast";
+import { auth } from "@/services/store";
+
+export default function Login() {
+  const navigate = useNavigate();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const onSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    const res = await auth.login(email, password);
+    setLoading(false);
+    if (!res.ok) {
+      toast({ title: "Sign in failed", description: res.error, variant: "destructive" });
+      return;
+    }
+    toast({ title: "Welcome back!", description: "Signed in successfully." });
+    navigate("/dashboard");
+  };
+
+  return (
+    <AuthShell
+      title="Sign in to your account"
+      subtitle="Enter your credentials to continue."
+      footer={<>Don't have an account? <Link to="/signup" className="text-primary font-medium hover:underline">Sign up</Link></>}
+    >
+      <form onSubmit={onSubmit} className="space-y-4">
+        <div className="space-y-2">
+          <Label htmlFor="email">Email</Label>
+          <Input id="email" type="email" placeholder="you@university.edu" value={email} onChange={(e) => setEmail(e.target.value)} required />
+        </div>
+        <div className="space-y-2">
+          <div className="flex justify-between items-center">
+            <Label htmlFor="password">Password</Label>
+            <Link to="/forgot-password" className="text-xs text-primary hover:underline">Forgot password?</Link>
+          </div>
+          <Input id="password" type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} required />
+        </div>
+        <Button type="submit" disabled={loading} className="w-full bg-gradient-primary hover:opacity-90 shadow-elegant">
+          {loading ? "Signing in…" : "Sign in"}
+        </Button>
+      </form>
+    </AuthShell>
+  );
+}

@@ -1,0 +1,143 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* StudyShare Design System — clean light + indigo accent. All colors HSL. */
+
+@layer base {
+  :root {
+    --background: 220 33% 98%;
+    --foreground: 222 47% 11%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+
+    --primary: 238 84% 60%;
+    --primary-foreground: 0 0% 100%;
+    --primary-glow: 238 95% 72%;
+
+    --secondary: 220 20% 95%;
+    --secondary-foreground: 222 47% 11%;
+
+    --muted: 220 20% 96%;
+    --muted-foreground: 220 10% 46%;
+
+    --accent: 238 100% 96%;
+    --accent-foreground: 238 84% 50%;
+
+    --success: 152 70% 42%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 16% 90%;
+    --input: 220 16% 90%;
+    --ring: 238 84% 60%;
+
+    --radius: 0.75rem;
+
+    --gradient-primary: linear-gradient(135deg, hsl(238 84% 60%), hsl(262 83% 65%));
+    --gradient-subtle: linear-gradient(180deg, hsl(220 33% 99%), hsl(220 33% 96%));
+    --shadow-card: 0 1px 2px 0 hsl(222 47% 11% / 0.04), 0 4px 16px -4px hsl(238 84% 60% / 0.08);
+    --shadow-elegant: 0 10px 40px -12px hsl(238 84% 60% / 0.25);
+
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 222 30% 25%;
+    --sidebar-primary: 238 84% 60%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 238 100% 97%;
+    --sidebar-accent-foreground: 238 84% 50%;
+    --sidebar-border: 220 16% 92%;
+    --sidebar-ring: 238 84% 60%;
+  }
+
+  .dark {
+    --background: 222 47% 7%;
+    --foreground: 210 40% 98%;
+
+    --card: 222 47% 10%;
+    --card-foreground: 210 40% 98%;
+
+    --popover: 222 47% 10%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 238 95% 72%;
+    --primary-foreground: 222 47% 11%;
+    --primary-glow: 238 100% 80%;
+
+    --secondary: 217 32% 17%;
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 217 32% 15%;
+    --muted-foreground: 215 20% 65%;
+
+    --accent: 238 50% 20%;
+    --accent-foreground: 238 95% 80%;
+
+    --success: 152 60% 50%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 38 92% 55%;
+    --warning-foreground: 0 0% 100%;
+
+    --destructive: 0 70% 55%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 217 32% 18%;
+    --input: 217 32% 18%;
+    --ring: 238 95% 72%;
+
+    --gradient-primary: linear-gradient(135deg, hsl(238 95% 72%), hsl(262 90% 75%));
+    --gradient-subtle: linear-gradient(180deg, hsl(222 47% 8%), hsl(222 47% 6%));
+    --shadow-card: 0 1px 2px 0 hsl(0 0% 0% / 0.3), 0 4px 16px -4px hsl(238 95% 72% / 0.15);
+    --shadow-elegant: 0 10px 40px -12px hsl(238 95% 72% / 0.35);
+
+    --sidebar-background: 222 47% 9%;
+    --sidebar-foreground: 215 20% 75%;
+    --sidebar-primary: 238 95% 72%;
+    --sidebar-primary-foreground: 222 47% 11%;
+    --sidebar-accent: 238 50% 18%;
+    --sidebar-accent-foreground: 238 95% 80%;
+    --sidebar-border: 217 32% 18%;
+    --sidebar-ring: 238 95% 72%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+}
+
+@layer utilities {
+  .bg-gradient-primary {
+    background: var(--gradient-primary);
+  }
+  .bg-gradient-subtle {
+    background: var(--gradient-subtle);
+  }
+  .shadow-card {
+    box-shadow: var(--shadow-card);
+  }
+  .shadow-elegant {
+    box-shadow: var(--shadow-elegant);
+  }
+  .text-gradient {
+    background: var(--gradient-primary);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+}
