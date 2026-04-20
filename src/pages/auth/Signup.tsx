@@ -25,7 +25,7 @@ export default function Signup() {
     }
     toast({
       title: "Account created!",
-      description: "Check your email to confirm your account, then sign in.",
+      description: "Your account is ready. Please sign in.",
     });
     navigate("/login");
   };

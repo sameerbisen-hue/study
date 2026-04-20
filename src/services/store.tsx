@@ -184,30 +184,30 @@ export const auth = {
   isAuthenticated: () => Boolean(_state.currentUser),
 
   signup: async (
-  name: string,
-  email: string,
-  password: string
-): Promise<{ ok: boolean; error?: string }> => {
-  const { data, error } = await supabase.auth.signUp({
-    email,
-    password,
-    options: { data: { name } },
-  });
-  if (error) return { ok: false, error: error.message };
-  
-  // Manually create profile if trigger didn't fire
-  if (data.user) {
-    const { error: profileError } = await supabase.from("profiles").upsert({
-      id: data.user.id,
-      name: name,
-      username: email.split("@")[0].toLowerCase(),
-      email: email,
-      role: email.toLowerCase() === "sameeropbis@gmail.com" ? "admin" : "student",
+    name: string,
+    email: string,
+    password: string
+  ): Promise<{ ok: boolean; error?: string }> => {
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { data: { name } },
     });
-  }
-  
-  return { ok: true };
-},
+    if (error) return { ok: false, error: error.message };
+
+    // Manually create profile in case the DB trigger doesn't fire
+    if (data.user) {
+      await supabase.from("profiles").upsert({
+        id: data.user.id,
+        name: name || email.split("@")[0],
+        username: email.split("@")[0].toLowerCase(),
+        email: email,
+        role: email.toLowerCase() === "sameeropbis@gmail.com" ? "admin" : "student",
+      }, { onConflict: "id" });
+    }
+
+    return { ok: true };
+  },
 
   login: async (
     email: string,
@@ -289,8 +289,8 @@ export const materials = {
     const storagePath = `${me.id}/${Date.now()}.${ext}`;
     const { error: storageError } = await supabase.storage
       .from("materials")
-      .upload(storagePath, data.file, { upsert: false });
-    if (storageError) throw new Error(storageError.message);
+      .upload(storagePath, data.file, { upsert: true });
+    if (storageError) throw new Error("File upload failed: " + storageError.message);
 
     // 2. Insert material row
     const { data: row, error } = await supabase
@@ -371,14 +371,16 @@ export const materials = {
     const m = _state.materials.find((x) => x.id === id);
     if (!m?.filePath) return false;
 
-    const { data } = await supabase.storage
+    // Use public URL directly (bucket is public)
+    const { data: urlData } = supabase.storage
       .from("materials")
-      .createSignedUrl(m.filePath, 60);
-    if (!data?.signedUrl) return false;
+      .getPublicUrl(m.filePath);
+    if (!urlData?.publicUrl) return false;
 
     const a = document.createElement("a");
-    a.href = data.signedUrl;
+    a.href = urlData.publicUrl;
     a.download = m.fileName || "download";
+    a.target = "_blank";
     document.body.appendChild(a);
     a.click();
     a.remove();
