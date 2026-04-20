@@ -184,18 +184,30 @@ export const auth = {
   isAuthenticated: () => Boolean(_state.currentUser),
 
   signup: async (
-    name: string,
-    email: string,
-    password: string
-  ): Promise<{ ok: boolean; error?: string }> => {
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: { data: { name } },
+  name: string,
+  email: string,
+  password: string
+): Promise<{ ok: boolean; error?: string }> => {
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: { data: { name } },
+  });
+  if (error) return { ok: false, error: error.message };
+  
+  // Manually create profile if trigger didn't fire
+  if (data.user) {
+    const { error: profileError } = await supabase.from("profiles").upsert({
+      id: data.user.id,
+      name: name,
+      username: email.split("@")[0].toLowerCase(),
+      email: email,
+      role: email.toLowerCase() === "sameeropbis@gmail.com" ? "admin" : "student",
     });
-    if (error) return { ok: false, error: error.message };
-    return { ok: true };
-  },
+  }
+  
+  return { ok: true };
+},
 
   login: async (
     email: string,
