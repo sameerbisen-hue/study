@@ -1,23 +1,33 @@
 import { Link, useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import AuthShell from "@/components/auth/AuthShell";
 import { toast } from "@/hooks/use-toast";
-import { auth } from "@/services/store";
+import { auth, useStore } from "@/services/store";
 
 export default function Login() {
   const navigate = useNavigate();
+  const currentUser = useStore(state => state.currentUser);
+  const loadingState = useStore(state => state.loading);
+  
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // If already authenticated, redirect to dashboard
+  useEffect(() => {
+    if (!loadingState && currentUser) {
+      navigate("/dashboard");
+    }
+  }, [currentUser, loadingState, navigate]);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
+    setIsSubmitting(true);
     const res = await auth.login(email, password);
-    setLoading(false);
+    setIsSubmitting(false);
     if (!res.ok) {
       toast({ title: "Sign in failed", description: res.error, variant: "destructive" });
       return;
@@ -25,6 +35,14 @@ export default function Login() {
     toast({ title: "Welcome back!", description: "Signed in successfully." });
     navigate("/dashboard");
   };
+
+  if (loadingState) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="h-8 w-8 rounded-full border-4 border-primary border-t-transparent animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <AuthShell
@@ -44,8 +62,8 @@ export default function Login() {
           </div>
           <Input id="password" type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} required />
         </div>
-        <Button type="submit" disabled={loading} className="w-full bg-gradient-primary hover:opacity-90 shadow-elegant">
-          {loading ? "Signing in…" : "Sign in"}
+        <Button type="submit" disabled={isSubmitting} className="w-full bg-gradient-primary hover:opacity-90 shadow-elegant">
+          {isSubmitting ? "Signing in…" : "Sign in"}
         </Button>
       </form>
     </AuthShell>

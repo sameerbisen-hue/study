@@ -63,36 +63,77 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   _state = state;
 
   useEffect(() => {
-    const handleSession = async (session: any) => {
-      if (session?.user) {
-        let profile = await fetchProfile(session.user.id);
-        if (!profile) {
-          // Fallback: manually create if db trigger failed or if missing
-          await supabase.from("profiles").upsert({
-            id: session.user.id,
-            name: session.user.user_metadata?.name || session.user.email?.split("@")[0] || "User",
-            username: (session.user.email?.split("@")[0] || "user").toLowerCase(),
-            email: session.user.email || "",
-            role: session.user.email?.toLowerCase() === "sameeropbis@gmail.com" ? "admin" : "student",
-          }, { onConflict: "id" });
-          profile = await fetchProfile(session.user.id);
+    let isMounted = true;
+
+    const loadProfile = async (userId: string, userMeta: any) => {
+      let profile = await fetchProfile(userId);
+      if (!profile) {
+        // Fallback: manually create if db trigger failed or if missing
+        await supabase.from("profiles").upsert({
+          id: userId,
+          name: userMeta?.name || userMeta?.email?.split("@")[0] || "User",
+          username: (userMeta?.email?.split("@")[0] || "user").toLowerCase(),
+          email: userMeta?.email || "",
+          role: userMeta?.email?.toLowerCase() === "sameeropbis@gmail.com" ? "admin" : "student",
+        }, { onConflict: "id" });
+        profile = await fetchProfile(userId);
+      }
+      return profile;
+    };
+
+    const { data: listener } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (!isMounted) return;
+
+        // On sign-out, clear everything immediately
+        if (event === "SIGNED_OUT") {
+          patchState({ currentUser: null, loading: false, bookmarks: [], materials: [] });
+          return;
         }
+
+        // Token refreshed — session is already valid, no need to reload profile
+        if (event === "TOKEN_REFRESHED") {
+          return;
+        }
+
+        // No session at all (e.g. first visit, no stored session)
+        if (!session?.user) {
+          patchState({ currentUser: null, loading: false, bookmarks: [] });
+          return;
+        }
+
+        // For returning users (INITIAL_SESSION), the stored token may be expired.
+        // Validate it by calling getUser() which makes a real API call and
+        // triggers a token refresh if needed.
+        if (event === "INITIAL_SESSION") {
+          const { data: { user }, error } = await supabase.auth.getUser();
+          if (!isMounted) return;
+          if (error || !user) {
+            // Session is completely invalid — clear it so user can log in fresh
+            await supabase.auth.signOut();
+            patchState({ currentUser: null, loading: false, bookmarks: [] });
+            return;
+          }
+        }
+
+        // Session is valid — load the profile
+        const profile = await loadProfile(session.user.id, {
+          name: session.user.user_metadata?.name,
+          email: session.user.email,
+        });
+        if (!isMounted) return;
+
         patchState({ currentUser: profile, loading: false });
         if (profile) {
           await bookmarks.loadForUser(profile.id);
         }
-      } else {
-        patchState({ currentUser: null, loading: false, bookmarks: [] });
       }
-    };
-
-    const { data: listener } = supabase.auth.onAuthStateChange(
-      async (_event, session) => handleSession(session)
     );
-    
-    supabase.auth.getSession().then(({ data }) => handleSession(data.session));
-    
-    return () => listener.subscription.unsubscribe();
+
+    return () => {
+      isMounted = false;
+      listener.subscription.unsubscribe();
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -181,6 +222,60 @@ async function fetchProfile(userId: string): Promise<User | null> {
   return data ? rowToUser(data) : null;
 }
 
+async function waitForProfile(userId: string, attempts = 6): Promise<User | null> {
+  for (let i = 0; i < attempts; i += 1) {
+    const profile = await fetchProfile(userId);
+    if (profile) return profile;
+    await new Promise((resolve) => setTimeout(resolve, 500 * (i + 1)));
+  }
+  return null;
+}
+
+async function ensureProfile(params: {
+  userId: string;
+  email?: string | null;
+  name?: string | null;
+}): Promise<User | null> {
+  const existing = await waitForProfile(params.userId, 2);
+  if (existing) return existing;
+
+  const fallbackName =
+    params.name?.trim() || params.email?.split("@")[0] || "User";
+  const fallbackEmail = params.email || "";
+
+  const { error: upsertError } = await supabase.from("profiles").upsert(
+    {
+      id: params.userId,
+      name: fallbackName,
+      username: fallbackEmail
+        ? fallbackEmail.split("@")[0].toLowerCase()
+        : `user-${params.userId.slice(0, 8)}`,
+      email: fallbackEmail,
+      role:
+        fallbackEmail.toLowerCase() === "sameeropbis@gmail.com"
+          ? "admin"
+          : "student",
+    },
+    { onConflict: "id" }
+  );
+
+  if (upsertError) {
+    return waitForProfile(params.userId);
+  }
+
+  return waitForProfile(params.userId);
+}
+
+function triggerBrowserDownload(url: string, fileName: string) {
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = fileName;
+  anchor.rel = "noopener noreferrer";
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+}
+
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 
 export const auth = {
@@ -192,7 +287,12 @@ export const auth = {
     name: string,
     email: string,
     password: string
-  ): Promise<{ ok: boolean; error?: string }> => {
+  ): Promise<{
+    ok: boolean;
+    error?: string;
+    nextStep?: "dashboard" | "login";
+    message?: string;
+  }> => {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -200,34 +300,39 @@ export const auth = {
     });
     if (error) return { ok: false, error: error.message };
 
-    // Manually create profile in case the DB trigger doesn't fire
-    if (data.user) {
-      let profile = await fetchProfile(data.user.id);
-      
-      if (!profile) {
-        const { error: upsertError } = await supabase.from("profiles").upsert({
-          id: data.user.id,
-          name: name || email.split("@")[0],
-          username: email.split("@")[0].toLowerCase(),
-          email: email,
-          role: email.toLowerCase() === "sameeropbis@gmail.com" ? "admin" : "student",
-        }, { onConflict: "id" });
-        
-        if (upsertError) {
-          await new Promise(r => setTimeout(r, 1000));
-        }
-        profile = await fetchProfile(data.user.id);
-      }
-      
-      if (!profile) {
-        return { ok: false, error: "Account created but profile initialization failed. Ensure you have run the latest Supabase SQL schema." };
-      }
-      
-      // Prevent race condition: populate store before returning
-      patchState({ currentUser: profile, loading: false });
+    if (!data.user) {
+      return { ok: true, nextStep: "login" };
     }
 
-    return { ok: true };
+    const profile = await ensureProfile({
+      userId: data.user.id,
+      name,
+      email: data.user.email ?? email,
+    });
+
+    if (profile && data.session) {
+      patchState({ currentUser: profile, loading: false });
+      return {
+        ok: true,
+        nextStep: "dashboard",
+        message: "Your account is ready and you're signed in.",
+      };
+    }
+
+    if (profile) {
+      return {
+        ok: true,
+        nextStep: "login",
+        message: "Your account was created. Please sign in to continue.",
+      };
+    }
+
+    return {
+      ok: true,
+      nextStep: data.session ? "dashboard" : "login",
+      message:
+        "Your account was created, but your profile is still finishing setup. Please try signing in again in a moment.",
+    };
   },
 
   login: async (
@@ -241,11 +346,23 @@ export const auth = {
     if (error) return { ok: false, error: error.message };
     
     if (data.user) {
-      const profile = await fetchProfile(data.user.id);
-      if (profile) {
-        // Prevent race condition: populate store before returning
-        patchState({ currentUser: profile, loading: false });
+      const profile = await ensureProfile({
+        userId: data.user.id,
+        email: data.user.email ?? email,
+        name:
+          typeof data.user.user_metadata?.name === "string"
+            ? data.user.user_metadata.name
+            : null,
+      });
+      if (!profile) {
+        return {
+          ok: false,
+          error:
+            "Signed in, but your profile could not be loaded. Run the latest Supabase schema and try again.",
+        };
       }
+
+      patchState({ currentUser: profile, loading: false });
     }
     
     return { ok: true };
@@ -314,12 +431,21 @@ export const materials = {
     const me = _state.currentUser;
     if (!me) throw new Error("Not authenticated");
 
-    // 1. Upload file to Supabase Storage
-    const ext = data.fileName.split(".").pop();
-    const storagePath = `${me.id}/${Date.now()}.${ext}`;
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (!session) {
+      throw new Error("Your session has expired. Please sign in again and retry.");
+    }
+
+    const safeFileName = data.fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
+    const storagePath = `${me.id}/${Date.now()}-${safeFileName}`;
     const { error: storageError } = await supabase.storage
       .from("materials")
-      .upload(storagePath, data.file, { upsert: true });
+      .upload(storagePath, data.file, {
+        upsert: false,
+        contentType: data.file.type || undefined,
+      });
     if (storageError) throw new Error("File upload failed: " + storageError.message);
 
     // 2. Insert material row
@@ -341,7 +467,10 @@ export const materials = {
       })
       .select()
       .single();
-    if (error) throw new Error(error.message);
+    if (error) {
+      await supabase.storage.from("materials").remove([storagePath]);
+      throw new Error(error.message);
+    }
 
     // 3. Increment upload_count
     await supabase
@@ -401,30 +530,37 @@ export const materials = {
     const m = _state.materials.find((x) => x.id === id);
     if (!m?.filePath) return false;
 
-    // Use supabase.storage.download to bypass CORS issues for the download attribute
+    let downloadStarted = false;
+
     const { data: blob, error } = await supabase.storage
       .from("materials")
       .download(m.filePath);
 
-    if (error || !blob) {
-      // Fallback to public URL in new tab if download fails
-      const { data: urlData } = supabase.storage
-        .from("materials")
-        .getPublicUrl(m.filePath);
-      if (urlData?.publicUrl) {
-        window.open(urlData.publicUrl, "_blank");
-      }
-    } else {
+    if (!error && blob) {
       const blobUrl = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = blobUrl;
-      a.download = m.fileName || "download";
-      a.target = "_blank";
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
+      triggerBrowserDownload(blobUrl, m.fileName || "download");
       setTimeout(() => window.URL.revokeObjectURL(blobUrl), 1000);
+      downloadStarted = true;
+    } else {
+      const { data: signedUrlData, error: signedUrlError } = await supabase.storage
+        .from("materials")
+        .createSignedUrl(m.filePath, 60);
+
+      if (!signedUrlError && signedUrlData?.signedUrl) {
+        triggerBrowserDownload(signedUrlData.signedUrl, m.fileName || "download");
+        downloadStarted = true;
+      } else {
+        const { data: urlData } = supabase.storage
+          .from("materials")
+          .getPublicUrl(m.filePath);
+        if (urlData?.publicUrl) {
+          triggerBrowserDownload(urlData.publicUrl, m.fileName || "download");
+          downloadStarted = true;
+        }
+      }
     }
+
+    if (!downloadStarted) return false;
 
     await supabase
       .from("materials")

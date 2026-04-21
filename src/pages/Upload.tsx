@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useStore } from "@/services/store";
 import { Upload as UploadIcon, FileUp, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,6 +15,7 @@ import type { FileType } from "@/services/types";
 
 export default function Upload() {
   const navigate = useNavigate();
+  const currentUser = useStore(state => state.currentUser);
   const [title, setTitle] = useState("");
   const [subject, setSubject] = useState("");
   const [semester, setSemester] = useState("Sem 1");
@@ -23,6 +25,13 @@ export default function Upload() {
   const [file, setFile] = useState<File | null>(null);
   const [progress, setProgress] = useState(0);
   const [uploading, setUploading] = useState(false);
+
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (!currentUser) {
+      navigate("/login");
+    }
+  }, [currentUser, navigate]);
 
   const onFile = (f?: File) => {
     if (!f) return;
@@ -172,7 +181,7 @@ export default function Upload() {
               </div>
             )}
 
-            <Button type="submit" disabled={uploading} className="w-full bg-gradient-primary hover:opacity-90 shadow-elegant">
+            <Button type="submit" disabled={!currentUser || uploading} className="w-full bg-gradient-primary hover:opacity-90 shadow-elegant">
               {uploading ? "Uploading…" : "Publish material"}
             </Button>
           </form>

@@ -25,9 +25,10 @@ export default function Signup() {
     }
     toast({
       title: "Account created!",
-      description: "Your account is ready. Please sign in.",
+      description:
+        res.message || "Your account is ready. Please continue to sign in.",
     });
-    navigate("/login");
+    navigate(res.nextStep === "dashboard" ? "/dashboard" : "/login");
   };
 
   return (
