@@ -20,41 +20,43 @@ import Bookmarks from "./pages/Bookmarks.tsx";
 import AdminPanel from "./pages/admin/AdminPanel.tsx";
 import ReportManagement from "./pages/admin/ReportManagement.tsx";
 import Debug from "./pages/Debug.tsx";
+import AppErrorBoundary from "./components/AppErrorBoundary.tsx";
 
 const queryClient = new QueryClient();
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Index />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/signup" element={<Signup />} />
-          <Route path="/forgot-password" element={<ForgotPassword />} />
+  <AppErrorBoundary>
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<Index />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/signup" element={<Signup />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
 
-          <Route element={<AppLayout />}>
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/library" element={<Library />} />
-            <Route path="/upload" element={<Upload />} />
-            <Route path="/material/:id" element={<MaterialDetails />} />
-            <Route path="/leaderboard" element={<Leaderboard />} />
-            <Route path="/profile" element={<Profile />} />
-            <Route path="/bookmarks" element={<Bookmarks />} />
-            <Route path="/admin" element={<AdminPanel />} />
-            <Route path="/admin/reports" element={<ReportManagement />} />
-            <Route path="/debug" element={<Debug />} />
-          </Route>
+            <Route element={<AppLayout />}>
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/library" element={<Library />} />
+              <Route path="/upload" element={<Upload />} />
+              <Route path="/material/:id" element={<MaterialDetails />} />
+              <Route path="/leaderboard" element={<Leaderboard />} />
+              <Route path="/profile" element={<Profile />} />
+              <Route path="/bookmarks" element={<Bookmarks />} />
+              <Route path="/admin" element={<AdminPanel />} />
+              <Route path="/admin/reports" element={<ReportManagement />} />
+              <Route path="/debug" element={<Debug />} />
+            </Route>
 
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
-      <Analytics />
-    </TooltipProvider>
-  </QueryClientProvider>
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </BrowserRouter>
+        <Analytics />
+      </TooltipProvider>
+    </QueryClientProvider>
+  </AppErrorBoundary>
 );
 
 export default App;

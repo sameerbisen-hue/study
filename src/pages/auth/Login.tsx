@@ -10,7 +10,6 @@ import { auth, useStore } from "@/services/store";
 export default function Login() {
   const navigate = useNavigate();
   const currentUser = useStore(state => state.currentUser);
-  const loadingState = useStore(state => state.loading);
   
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -18,10 +17,10 @@ export default function Login() {
 
   // If already authenticated, redirect to dashboard
   useEffect(() => {
-    if (!loadingState && currentUser) {
+    if (currentUser) {
       navigate("/dashboard");
     }
-  }, [currentUser, loadingState, navigate]);
+  }, [currentUser, navigate]);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,14 +43,6 @@ export default function Login() {
       setIsSubmitting(false);
     }
   };
-
-  if (loadingState) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="h-8 w-8 rounded-full border-4 border-primary border-t-transparent animate-spin" />
-      </div>
-    );
-  }
 
   return (
     <AuthShell
