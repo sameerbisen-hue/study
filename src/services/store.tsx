@@ -3,19 +3,9 @@
  *
  * Public API is kept identical to the old localStorage store so that
  * all pages (Dashboard, Library, Upload, etc.) work without changes.
- *
- * Auth    → Supabase Auth (email + password)
- * Data    → Supabase Postgres via the JS client
- * Files   → Supabase Storage bucket "materials"
- * State   → React context + useState (no more manual pub/sub)
  */
 
-import React, {
-  createContext,
-  useContext,
-  useEffect,
-  useState,
-} from "react";
+import React, { createContext, useContext, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type {
   BadgeType,
@@ -29,15 +19,13 @@ import type {
 
 export type { FileType, BadgeType, Material, Report, ReportReason, Review, User };
 
-// ─── Context ─────────────────────────────────────────────────────────────────
-
 interface StoreState {
   currentUser: User | null;
   materials: Material[];
   users: User[];
   reviews: Review[];
   reports: Report[];
-  bookmarks: string[]; // material ids for current user
+  bookmarks: string[];
   loading: boolean;
 }
 
@@ -51,11 +39,27 @@ const defaultState: StoreState = {
   loading: true,
 };
 
-// Expose state + setState outside React so service functions can read/write.
 let _setState: React.Dispatch<React.SetStateAction<StoreState>> = () => {};
 let _state: StoreState = defaultState;
 
 const StoreContext = createContext<StoreState>(defaultState);
+
+function patchState(patch: Partial<StoreState>) {
+  _setState((prev) => {
+    const next = { ...prev, ...patch };
+    _state = next;
+    return next;
+  });
+}
+
+function clearAuthState() {
+  patchState({
+    currentUser: null,
+    loading: false,
+    bookmarks: [],
+    materials: [],
+  });
+}
 
 export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<StoreState>(defaultState);
@@ -73,7 +77,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         if (!isMounted) return;
 
         if (!session?.user) {
-          patchState({ currentUser: null, loading: false, bookmarks: [] });
+          clearAuthState();
           return;
         }
 
@@ -86,7 +90,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         if (error || !user) {
           await supabase.auth.signOut();
           if (!isMounted) return;
-          patchState({ currentUser: null, loading: false, bookmarks: [] });
+          clearAuthState();
           return;
         }
 
@@ -101,7 +105,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         if (!isMounted) return;
 
         if (!profile) {
-          patchState({ currentUser: null, loading: false, bookmarks: [] });
+          clearAuthState();
           return;
         }
 
@@ -109,98 +113,36 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         await bookmarks.loadForUser(profile.id);
       } catch {
         if (!isMounted) return;
-        patchState({ currentUser: null, loading: false, bookmarks: [] });
+        clearAuthState();
       }
     };
 
-    const loadProfile = async (
-      userId: string,
-      userMeta: { name?: string | null; email?: string | null }
-    ) =>
-      ensureProfile({
-        userId,
-        email: userMeta.email,
-        name: userMeta.name,
-      });
-
     void syncAuthState();
 
-    const { data: listener } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        if (!isMounted) return;
+    const { data: listener } = supabase.auth.onAuthStateChange(async (event) => {
+      if (!isMounted) return;
 
-        if (event === "SIGNED_OUT") {
-          patchState({
-            currentUser: null,
-            loading: false,
-            bookmarks: [],
-            materials: [],
-          });
-          return;
-        }
-
-        if (event === "TOKEN_REFRESHED") {
-          return;
-        }
-
-        patchState({ loading: true });
-        await syncAuthState();
+      if (event === "TOKEN_REFRESHED") {
         return;
-
-        // Token refreshed — session is already valid, no need to reload profile
-        if (event === "TOKEN_REFRESHED") {
-          return;
-        }
-
-        // For returning users (INITIAL_SESSION), the stored token may be expired.
-        // Validate it by calling getUser() which makes a real API call and
-        // triggers a token refresh if needed.
-        if (event === "INITIAL_SESSION") {
-          const { data: { user }, error } = await supabase.auth.getUser();
-          if (!isMounted) return;
-          if (error || !user) {
-            // Session is completely invalid — clear it so user can log in fresh
-            await supabase.auth.signOut();
-            patchState({ currentUser: null, loading: false, bookmarks: [] });
-            return;
-          }
-        }
-
-        // Session is valid — load the profile
-        const profile = await loadProfile(session.user.id, {
-          name: session.user.user_metadata?.name,
-          email: session.user.email,
-        });
-        if (!isMounted) return;
-
-        patchState({ currentUser: profile, loading: false });
-        if (profile) {
-          await bookmarks.loadForUser(profile.id);
-        }
       }
-    );
+
+      if (event === "SIGNED_OUT") {
+        clearAuthState();
+        return;
+      }
+
+      patchState({ loading: true });
+      await syncAuthState();
+    });
 
     return () => {
       isMounted = false;
       listener.subscription.unsubscribe();
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  return (
-    <StoreContext.Provider value={state}>{children}</StoreContext.Provider>
-  );
+  return <StoreContext.Provider value={state}>{children}</StoreContext.Provider>;
 }
-
-function patchState(patch: Partial<StoreState>) {
-  _setState((prev) => {
-    const next = { ...prev, ...patch };
-    _state = next;
-    return next;
-  });
-}
-
-// ─── useStore hook ────────────────────────────────────────────────────────────
 
 export function useStore<T>(selector: (s: StoreState) => T): T {
   const state = useContext(StoreContext);
@@ -215,8 +157,6 @@ export const select = {
   currentUser: (s: StoreState) => s.currentUser,
   bookmarks: (s: StoreState) => s.bookmarks,
 };
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function rowToUser(row: any): User {
@@ -289,8 +229,7 @@ async function ensureProfile(params: {
   const existing = await waitForProfile(params.userId, 2);
   if (existing) return existing;
 
-  const fallbackName =
-    params.name?.trim() || params.email?.split("@")[0] || "User";
+  const fallbackName = params.name?.trim() || params.email?.split("@")[0] || "User";
   const fallbackEmail = params.email || "";
 
   const { error: upsertError } = await supabase.from("profiles").upsert(
@@ -316,6 +255,26 @@ async function ensureProfile(params: {
   return waitForProfile(params.userId);
 }
 
+async function resolveCurrentUserProfile(): Promise<User | null> {
+  if (_state.currentUser) return _state.currentUser;
+
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser();
+
+  if (error || !user) return null;
+
+  return ensureProfile({
+    userId: user.id,
+    email: user.email,
+    name:
+      typeof user.user_metadata?.name === "string"
+        ? user.user_metadata.name
+        : null,
+  });
+}
+
 function triggerBrowserDownload(url: string, fileName: string) {
   const anchor = document.createElement("a");
   anchor.href = url;
@@ -325,8 +284,6 @@ function triggerBrowserDownload(url: string, fileName: string) {
   anchor.click();
   anchor.remove();
 }
-
-// ─── Auth ─────────────────────────────────────────────────────────────────────
 
 export const auth = {
   getCurrentUser: () => _state.currentUser,
@@ -404,7 +361,7 @@ export const auth = {
         password,
       });
       if (error) return { ok: false, error: error.message };
-      
+
       if (data.user) {
         const profile = await ensureProfile({
           userId: data.user.id,
@@ -414,6 +371,7 @@ export const auth = {
               ? data.user.user_metadata.name
               : null,
         });
+
         if (!profile) {
           return {
             ok: false,
@@ -438,7 +396,7 @@ export const auth = {
 
   logout: async () => {
     await supabase.auth.signOut();
-    patchState({ currentUser: null, materials: [], bookmarks: [] });
+    clearAuthState();
   },
 
   resetPassword: async (email: string): Promise<{ ok: boolean; error?: string }> => {
@@ -450,14 +408,13 @@ export const auth = {
   },
 };
 
-// ─── Materials ────────────────────────────────────────────────────────────────
-
 export const materials = {
   loadAll: async () => {
     const { data, error } = await supabase
       .from("materials")
       .select("*")
       .order("uploaded_at", { ascending: false });
+
     if (!error && data) {
       patchState({ materials: data.map(rowToMaterial) });
     }
@@ -496,27 +453,23 @@ export const materials = {
     fileSize: string;
     file: File;
   }): Promise<Material> => {
-    const me = _state.currentUser;
-    if (!me) throw new Error("Not authenticated");
-
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    if (!session) {
-      throw new Error("Your session has expired. Please sign in again and retry.");
-    }
+    const me = await resolveCurrentUserProfile();
+    if (!me) throw new Error("Please sign in again before uploading.");
 
     const safeFileName = data.fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
     const storagePath = `${me.id}/${Date.now()}-${safeFileName}`;
+
     const { error: storageError } = await supabase.storage
       .from("materials")
       .upload(storagePath, data.file, {
         upsert: false,
         contentType: data.file.type || undefined,
       });
-    if (storageError) throw new Error("File upload failed: " + storageError.message);
 
-    // 2. Insert material row
+    if (storageError) {
+      throw new Error("File upload failed: " + storageError.message);
+    }
+
     const { data: row, error } = await supabase
       .from("materials")
       .insert({
@@ -535,16 +488,17 @@ export const materials = {
       })
       .select()
       .single();
+
     if (error) {
       await supabase.storage.from("materials").remove([storagePath]);
       throw new Error(error.message);
     }
 
-    // 3. Increment upload_count
     await supabase
       .from("profiles")
       .update({ upload_count: me.uploadCount + 1 })
       .eq("id", me.id);
+
     patchState({ currentUser: { ...me, uploadCount: me.uploadCount + 1 } });
 
     const mat = rowToMaterial(row);
@@ -555,6 +509,7 @@ export const materials = {
   toggleUpvote: async (id: string) => {
     const uid = _state.currentUser?.id;
     if (!uid) return;
+
     const mat = _state.materials.find((m) => m.id === id);
     if (!mat) return;
 
@@ -564,7 +519,6 @@ export const materials = {
       : [...mat.upvotedBy, uid];
     const newUpvotes = has ? mat.upvotes - 1 : mat.upvotes + 1;
 
-    // Optimistic update
     patchState({
       materials: _state.materials.map((m) =>
         m.id === id ? { ...m, upvotedBy: newUpvotedBy, upvotes: newUpvotes } : m
@@ -578,16 +532,17 @@ export const materials = {
   },
 
   removeIfAllowed: async (id: string): Promise<boolean> => {
-    const me = _state.currentUser;
-    const m = _state.materials.find((x) => x.id === id);
-    if (!me || !m) return false;
-    if (me.role !== "admin" && m.uploaderId !== me.id) return false;
+    const me = await resolveCurrentUserProfile();
+    const material = _state.materials.find((x) => x.id === id);
+
+    if (!me || !material) return false;
+    if (me.role !== "admin" && material.uploaderId !== me.id) return false;
 
     const { error } = await supabase.from("materials").delete().eq("id", id);
     if (error) return false;
 
-    if (m.filePath) {
-      await supabase.storage.from("materials").remove([m.filePath]);
+    if (material.filePath) {
+      await supabase.storage.from("materials").remove([material.filePath]);
     }
 
     patchState({ materials: _state.materials.filter((x) => x.id !== id) });
@@ -595,34 +550,35 @@ export const materials = {
   },
 
   download: async (id: string): Promise<boolean> => {
-    const m = _state.materials.find((x) => x.id === id);
-    if (!m?.filePath) return false;
+    const material = _state.materials.find((x) => x.id === id);
+    if (!material?.filePath) return false;
 
     let downloadStarted = false;
 
     const { data: blob, error } = await supabase.storage
       .from("materials")
-      .download(m.filePath);
+      .download(material.filePath);
 
     if (!error && blob) {
       const blobUrl = window.URL.createObjectURL(blob);
-      triggerBrowserDownload(blobUrl, m.fileName || "download");
+      triggerBrowserDownload(blobUrl, material.fileName || "download");
       setTimeout(() => window.URL.revokeObjectURL(blobUrl), 1000);
       downloadStarted = true;
     } else {
       const { data: signedUrlData, error: signedUrlError } = await supabase.storage
         .from("materials")
-        .createSignedUrl(m.filePath, 60);
+        .createSignedUrl(material.filePath, 60);
 
       if (!signedUrlError && signedUrlData?.signedUrl) {
-        triggerBrowserDownload(signedUrlData.signedUrl, m.fileName || "download");
+        triggerBrowserDownload(signedUrlData.signedUrl, material.fileName || "download");
         downloadStarted = true;
       } else {
         const { data: urlData } = supabase.storage
           .from("materials")
-          .getPublicUrl(m.filePath);
+          .getPublicUrl(material.filePath);
+
         if (urlData?.publicUrl) {
-          triggerBrowserDownload(urlData.publicUrl, m.fileName || "download");
+          triggerBrowserDownload(urlData.publicUrl, material.fileName || "download");
           downloadStarted = true;
         }
       }
@@ -632,7 +588,7 @@ export const materials = {
 
     await supabase
       .from("materials")
-      .update({ downloads: m.downloads + 1 })
+      .update({ downloads: material.downloads + 1 })
       .eq("id", id);
 
     patchState({
@@ -640,6 +596,7 @@ export const materials = {
         x.id === id ? { ...x, downloads: x.downloads + 1 } : x
       ),
     });
+
     return true;
   },
 
@@ -648,8 +605,6 @@ export const materials = {
     return data.publicUrl;
   },
 };
-
-// ─── Reviews ─────────────────────────────────────────────────────────────────
 
 export const reviews = {
   forMaterial: (materialId: string) =>
@@ -663,6 +618,7 @@ export const reviews = {
       .select("*")
       .eq("material_id", materialId)
       .order("created_at", { ascending: false });
+
     if (!error && data) {
       const existing = _state.reviews.filter((r) => r.materialId !== materialId);
       patchState({
@@ -684,7 +640,7 @@ export const reviews = {
   },
 
   add: async (materialId: string, rating: number, comment: string) => {
-    const me = _state.currentUser;
+    const me = await resolveCurrentUserProfile();
     if (!me) return;
 
     const { data, error } = await supabase
@@ -699,6 +655,7 @@ export const reviews = {
       })
       .select()
       .single();
+
     if (error) throw new Error(error.message);
 
     const newReview: Review = {
@@ -716,10 +673,12 @@ export const reviews = {
       const total = mat.ratingAvg * mat.ratingCount + rating;
       const count = mat.ratingCount + 1;
       const newAvg = Math.round((total / count) * 10) / 10;
+
       await supabase
         .from("materials")
         .update({ rating_avg: newAvg, rating_count: count })
         .eq("id", materialId);
+
       patchState({
         materials: _state.materials.map((m) =>
           m.id === materialId ? { ...m, ratingAvg: newAvg, ratingCount: count } : m
@@ -739,8 +698,6 @@ export const reviews = {
   },
 };
 
-// ─── Reports ─────────────────────────────────────────────────────────────────
-
 export const reports = {
   list: () => _state.reports,
 
@@ -749,6 +706,7 @@ export const reports = {
       .from("reports")
       .select("*")
       .order("created_at", { ascending: false });
+
     if (!error && data) {
       patchState({
         reports: data.map((r) => ({
@@ -767,8 +725,9 @@ export const reports = {
   },
 
   add: async (materialId: string, reason: ReportReason, message?: string) => {
-    const me = _state.currentUser;
+    const me = await resolveCurrentUserProfile();
     if (!me) return;
+
     const mat = _state.materials.find((m) => m.id === materialId);
     await supabase.from("reports").insert({
       material_id: materialId,
@@ -788,8 +747,6 @@ export const reports = {
   },
 };
 
-// ─── Users ────────────────────────────────────────────────────────────────────
-
 export const users = {
   list: () => _state.users,
 
@@ -798,6 +755,7 @@ export const users = {
       .from("profiles")
       .select("*")
       .order("total_upvotes", { ascending: false });
+
     if (!error && data) {
       patchState({ users: data.map(rowToUser) });
     }
@@ -808,6 +766,7 @@ export const users = {
   toggleBlock: async (id: string) => {
     const user = _state.users.find((u) => u.id === id);
     if (!user) return;
+
     const blocked = !user.blocked;
     await supabase.from("profiles").update({ blocked }).eq("id", id);
     patchState({
@@ -815,8 +774,6 @@ export const users = {
     });
   },
 };
-
-// ─── Bookmarks ────────────────────────────────────────────────────────────────
 
 export const bookmarks = {
   list: () => _state.bookmarks,
@@ -826,26 +783,30 @@ export const bookmarks = {
       .from("bookmarks")
       .select("material_id")
       .eq("user_id", userId);
+
     patchState({
       bookmarks: data ? data.map((r) => r.material_id as string) : [],
     });
   },
 
   toggle: async (materialId: string) => {
-    const uid = _state.currentUser?.id;
-    if (!uid) return;
+    const me = await resolveCurrentUserProfile();
+    if (!me) return;
+
     const has = _state.bookmarks.includes(materialId);
     if (has) {
       await supabase
         .from("bookmarks")
         .delete()
-        .eq("user_id", uid)
+        .eq("user_id", me.id)
         .eq("material_id", materialId);
+
       patchState({ bookmarks: _state.bookmarks.filter((x) => x !== materialId) });
     } else {
       await supabase
         .from("bookmarks")
-        .insert({ user_id: uid, material_id: materialId });
+        .insert({ user_id: me.id, material_id: materialId });
+
       patchState({ bookmarks: [..._state.bookmarks, materialId] });
     }
   },
