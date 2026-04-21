@@ -16,19 +16,28 @@ export default function Signup() {
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
-    const res = await auth.signup(name, email, password);
-    setLoading(false);
-    if (!res.ok) {
-      toast({ title: "Signup failed", description: res.error, variant: "destructive" });
-      return;
+    try {
+      setLoading(true);
+      const res = await auth.signup(name, email, password);
+      if (!res.ok) {
+        toast({ title: "Signup failed", description: res.error, variant: "destructive" });
+        return;
+      }
+      toast({
+        title: "Account created!",
+        description:
+          res.message || "Your account is ready. Please continue to sign in.",
+      });
+      navigate(res.nextStep === "dashboard" ? "/dashboard" : "/login");
+    } catch (error) {
+      toast({
+        title: "Signup failed",
+        description: error instanceof Error ? error.message : "Something went wrong.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
     }
-    toast({
-      title: "Account created!",
-      description:
-        res.message || "Your account is ready. Please continue to sign in.",
-    });
-    navigate(res.nextStep === "dashboard" ? "/dashboard" : "/login");
   };
 
   return (

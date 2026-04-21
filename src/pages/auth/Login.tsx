@@ -25,15 +25,24 @@ export default function Login() {
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSubmitting(true);
-    const res = await auth.login(email, password);
-    setIsSubmitting(false);
-    if (!res.ok) {
-      toast({ title: "Sign in failed", description: res.error, variant: "destructive" });
-      return;
+    try {
+      setIsSubmitting(true);
+      const res = await auth.login(email, password);
+      if (!res.ok) {
+        toast({ title: "Sign in failed", description: res.error, variant: "destructive" });
+        return;
+      }
+      toast({ title: "Welcome back!", description: "Signed in successfully." });
+      navigate("/dashboard");
+    } catch (error) {
+      toast({
+        title: "Sign in failed",
+        description: error instanceof Error ? error.message : "Something went wrong.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
     }
-    toast({ title: "Welcome back!", description: "Signed in successfully." });
-    navigate("/dashboard");
   };
 
   if (loadingState) {

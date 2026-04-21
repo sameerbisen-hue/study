@@ -147,20 +147,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         await syncAuthState();
         return;
 
-        // On sign-out, clear everything immediately
-        if (event === "SIGNED_OUT") {
-          patchState({ currentUser: null, loading: false, bookmarks: [], materials: [] });
-          return;
-        }
-
         // Token refreshed — session is already valid, no need to reload profile
         if (event === "TOKEN_REFRESHED") {
-          return;
-        }
-
-        // No session at all (e.g. first visit, no stored session)
-        if (!session?.user) {
-          patchState({ currentUser: null, loading: false, bookmarks: [] });
           return;
         }
 
@@ -355,81 +343,97 @@ export const auth = {
     nextStep?: "dashboard" | "login";
     message?: string;
   }> => {
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: { data: { name } },
-    });
-    if (error) return { ok: false, error: error.message };
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: { data: { name } },
+      });
+      if (error) return { ok: false, error: error.message };
 
-    if (!data.user) {
-      return { ok: true, nextStep: "login" };
-    }
+      if (!data.user) {
+        return { ok: true, nextStep: "login" };
+      }
 
-    const profile = await ensureProfile({
-      userId: data.user.id,
-      name,
-      email: data.user.email ?? email,
-    });
+      const profile = await ensureProfile({
+        userId: data.user.id,
+        name,
+        email: data.user.email ?? email,
+      });
 
-    if (profile && data.session) {
-      patchState({ currentUser: profile, loading: false });
-      await bookmarks.loadForUser(profile.id);
+      if (profile && data.session) {
+        patchState({ currentUser: profile, loading: false });
+        await bookmarks.loadForUser(profile.id);
+        return {
+          ok: true,
+          nextStep: "dashboard",
+          message: "Your account is ready and you're signed in.",
+        };
+      }
+
+      if (profile) {
+        return {
+          ok: true,
+          nextStep: "login",
+          message: "Your account was created. Please sign in to continue.",
+        };
+      }
+
       return {
         ok: true,
-        nextStep: "dashboard",
-        message: "Your account is ready and you're signed in.",
+        nextStep: data.session ? "dashboard" : "login",
+        message:
+          "Your account was created, but your profile is still finishing setup. Please try signing in again in a moment.",
       };
-    }
-
-    if (profile) {
+    } catch (error) {
       return {
-        ok: true,
-        nextStep: "login",
-        message: "Your account was created. Please sign in to continue.",
+        ok: false,
+        error:
+          error instanceof Error ? error.message : "Unable to create account right now.",
       };
     }
-
-    return {
-      ok: true,
-      nextStep: data.session ? "dashboard" : "login",
-      message:
-        "Your account was created, but your profile is still finishing setup. Please try signing in again in a moment.",
-    };
   },
 
   login: async (
     email: string,
     password: string
   ): Promise<{ ok: boolean; error?: string }> => {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-    if (error) return { ok: false, error: error.message };
-    
-    if (data.user) {
-      const profile = await ensureProfile({
-        userId: data.user.id,
-        email: data.user.email ?? email,
-        name:
-          typeof data.user.user_metadata?.name === "string"
-            ? data.user.user_metadata.name
-            : null,
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
       });
-      if (!profile) {
-        return {
-          ok: false,
-          error:
-            "Signed in, but your profile could not be loaded. Run the latest Supabase schema and try again.",
-        };
+      if (error) return { ok: false, error: error.message };
+      
+      if (data.user) {
+        const profile = await ensureProfile({
+          userId: data.user.id,
+          email: data.user.email ?? email,
+          name:
+            typeof data.user.user_metadata?.name === "string"
+              ? data.user.user_metadata.name
+              : null,
+        });
+        if (!profile) {
+          return {
+            ok: false,
+            error:
+              "Signed in, but your profile could not be loaded. Run the latest Supabase schema and try again.",
+          };
+        }
+
+        patchState({ currentUser: profile, loading: false });
+        await bookmarks.loadForUser(profile.id);
       }
 
-      patchState({ currentUser: profile, loading: false });
-      await bookmarks.loadForUser(profile.id);
+      return { ok: true };
+    } catch (error) {
+      return {
+        ok: false,
+        error:
+          error instanceof Error ? error.message : "Unable to sign in right now.",
+      };
     }
-    
-    return { ok: true };
   },
 
   logout: async () => {
