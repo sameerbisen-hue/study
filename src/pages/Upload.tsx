@@ -41,11 +41,21 @@ export default function Upload() {
       toast({ title: "Missing info", description: "Title, subject and a file are required.", variant: "destructive" });
       return;
     }
+    
+    // Check file size (50MB limit)
+    if (file.size > 50 * 1024 * 1024) {
+      toast({ title: "File too large", description: "Please select a file smaller than 50MB.", variant: "destructive" });
+      return;
+    }
+
     setUploading(true);
-    setProgress(30);
+    setProgress(10);
+
+    const interval = setInterval(() => {
+      setProgress((p) => (p >= 90 ? 90 : p + 5));
+    }, 800);
 
     try {
-      setProgress(60);
       const newMat = await materials.upload({
         title,
         subject,
@@ -57,16 +67,19 @@ export default function Upload() {
         fileSize: `${(file.size / (1024 * 1024)).toFixed(2)} MB`,
         file,
       });
+      clearInterval(interval);
       setProgress(100);
       toast({ title: "Upload complete!", description: "Your material is now in the library." });
       navigate(`/material/${newMat.id}`);
     } catch (err) {
+      clearInterval(interval);
       toast({
         title: "Upload failed",
         description: err instanceof Error ? err.message : "Something went wrong.",
         variant: "destructive",
       });
     } finally {
+      clearInterval(interval);
       setUploading(false);
     }
   };
