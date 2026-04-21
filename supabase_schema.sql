@@ -144,16 +144,26 @@ create policy "bookmarks: owner delete"
 -- (Storage → New bucket → Name: materials, Public: true)
 -- Then add this storage policy in the SQL editor:
 
--- insert into storage.buckets (id, name, public) values ('materials', 'materials', true)
--- on conflict do nothing;
+insert into storage.buckets (id, name, public) values ('materials', 'materials', true)
+on conflict do nothing;
 
--- Uncomment if not created via dashboard:
--- create policy "storage: authenticated upload"
---   on storage.objects for insert with check (
---     bucket_id = 'materials' and auth.role() = 'authenticated'
---   );
--- create policy "storage: public read"
---   on storage.objects for select using (bucket_id = 'materials');
+create policy "storage: authenticated upload"
+  on storage.objects for insert with check (
+    bucket_id = 'materials' and auth.role() = 'authenticated'
+  );
+
+create policy "storage: owner update"
+  on storage.objects for update using (
+    bucket_id = 'materials' and owner = auth.uid()
+  );
+
+create policy "storage: owner delete"
+  on storage.objects for delete using (
+    bucket_id = 'materials' and owner = auth.uid()
+  );
+
+create policy "storage: public read"
+  on storage.objects for select using (bucket_id = 'materials');
 
 -- ── Trigger: auto-create profile on signup ───────────────────
 create or replace function public.handle_new_user()

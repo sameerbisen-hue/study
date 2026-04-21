@@ -385,19 +385,30 @@ export const materials = {
     const m = _state.materials.find((x) => x.id === id);
     if (!m?.filePath) return false;
 
-    // Use public URL directly (bucket is public)
-    const { data: urlData } = supabase.storage
+    // Use supabase.storage.download to bypass CORS issues for the download attribute
+    const { data: blob, error } = await supabase.storage
       .from("materials")
-      .getPublicUrl(m.filePath);
-    if (!urlData?.publicUrl) return false;
+      .download(m.filePath);
 
-    const a = document.createElement("a");
-    a.href = urlData.publicUrl;
-    a.download = m.fileName || "download";
-    a.target = "_blank";
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
+    if (error || !blob) {
+      // Fallback to public URL in new tab if download fails
+      const { data: urlData } = supabase.storage
+        .from("materials")
+        .getPublicUrl(m.filePath);
+      if (urlData?.publicUrl) {
+        window.open(urlData.publicUrl, "_blank");
+      }
+    } else {
+      const blobUrl = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = m.fileName || "download";
+      a.target = "_blank";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => window.URL.revokeObjectURL(blobUrl), 1000);
+    }
 
     await supabase
       .from("materials")
