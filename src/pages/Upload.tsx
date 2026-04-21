@@ -165,7 +165,10 @@ export default function Upload() {
             {uploading && (
               <div className="space-y-2">
                 <Progress value={progress} />
-                <p className="text-xs text-muted-foreground">Uploading to Supabase… {progress}%</p>
+                <p className="text-xs text-muted-foreground flex justify-between">
+                  <span>Uploading to Supabase… {progress}%</span>
+                  {progress >= 90 && <span className="text-primary animate-pulse">Processing... please wait</span>}
+                </p>
               </div>
             )}
 
