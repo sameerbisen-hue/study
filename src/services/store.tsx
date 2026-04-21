@@ -94,7 +94,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           return;
         }
 
-        const profile = await ensureProfile({
+        // Add timeout for profile creation
+        const profilePromise = ensureProfile({
           userId: user.id,
           email: user.email,
           name:
@@ -102,16 +103,29 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
               ? user.user_metadata.name
               : null,
         });
+
+        const timeoutPromise = new Promise<null>((_, reject) => 
+          setTimeout(() => reject(new Error("Profile creation timeout")), 10000)
+        );
+
+        const profile = await Promise.race([profilePromise, timeoutPromise]).catch(() => null);
+        
         if (!isMounted) return;
 
         if (!profile) {
+          console.warn("Profile creation failed or timed out");
           clearAuthState();
           return;
         }
 
         patchState({ currentUser: profile, loading: false });
-        await bookmarks.loadForUser(profile.id);
-      } catch {
+        
+        // Load bookmarks in background without blocking
+        bookmarks.loadForUser(profile.id).catch(error => {
+          console.error("Failed to load bookmarks:", error);
+        });
+      } catch (error) {
+        console.error("Auth state sync error:", error);
         if (!isMounted) return;
         clearAuthState();
       }
@@ -131,8 +145,18 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
+      // Prevent multiple concurrent syncs
+      if (_state.loading) return;
+      
       patchState({ loading: true });
-      await syncAuthState();
+      
+      try {
+        await syncAuthState();
+      } catch (error) {
+        console.error("Auth state change error:", error);
+        if (!isMounted) return;
+        clearAuthState();
+      }
     });
 
     return () => {
@@ -222,11 +246,17 @@ async function fetchProfile(userId: string): Promise<User | null> {
   return data ? rowToUser(data) : null;
 }
 
-async function waitForProfile(userId: string, attempts = 6): Promise<User | null> {
+async function waitForProfile(userId: string, attempts = 3): Promise<User | null> {
   for (let i = 0; i < attempts; i += 1) {
-    const profile = await fetchProfile(userId);
-    if (profile) return profile;
-    await new Promise((resolve) => setTimeout(resolve, 500 * (i + 1)));
+    try {
+      const profile = await fetchProfile(userId);
+      if (profile) return profile;
+    } catch (error) {
+      console.error("Profile fetch error:", error);
+    }
+    if (i < attempts - 1) {
+      await new Promise((resolve) => setTimeout(resolve, 300 * (i + 1)));
+    }
   }
   return null;
 }
@@ -242,27 +272,35 @@ async function ensureProfile(params: {
   const fallbackName = params.name?.trim() || params.email?.split("@")[0] || "User";
   const fallbackEmail = params.email || "";
 
-  const { error: upsertError } = await supabase.from("profiles").upsert(
-    {
-      id: params.userId,
-      name: fallbackName,
-      username: fallbackEmail
-        ? fallbackEmail.split("@")[0].toLowerCase()
-        : `user-${params.userId.slice(0, 8)}`,
-      email: fallbackEmail,
-      role:
-        fallbackEmail.toLowerCase() === "sameeropbis@gmail.com"
-          ? "admin"
-          : "student",
-    },
-    { onConflict: "id" }
-  );
+  try {
+    const { error: upsertError } = await supabase.from("profiles").upsert(
+      {
+        id: params.userId,
+        name: fallbackName,
+        username: fallbackEmail
+          ? fallbackEmail.split("@")[0].toLowerCase()
+          : `user-${params.userId.slice(0, 8)}`,
+        email: fallbackEmail,
+        role:
+          fallbackEmail.toLowerCase() === "sameeropbis@gmail.com"
+            ? "admin"
+            : "student",
+      },
+      { onConflict: "id" }
+    );
 
-  if (upsertError) {
-    return waitForProfile(params.userId);
+    if (upsertError) {
+      console.error("Profile upsert error:", upsertError);
+      // Try to fetch the profile one more time in case it was created by a trigger
+      return waitForProfile(params.userId, 2);
+    }
+
+    // Wait for the profile to be available
+    return waitForProfile(params.userId, 3);
+  } catch (error) {
+    console.error("Profile creation error:", error);
+    return waitForProfile(params.userId, 2);
   }
-
-  return waitForProfile(params.userId);
 }
 
 async function resolveCurrentUserProfile(): Promise<User | null> {
