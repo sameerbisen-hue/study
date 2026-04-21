@@ -202,22 +202,29 @@ export const auth = {
 
     // Manually create profile in case the DB trigger doesn't fire
     if (data.user) {
-      const { error: upsertError } = await supabase.from("profiles").upsert({
-        id: data.user.id,
-        name: name || email.split("@")[0],
-        username: email.split("@")[0].toLowerCase(),
-        email: email,
-        role: email.toLowerCase() === "sameeropbis@gmail.com" ? "admin" : "student",
-      }, { onConflict: "id" });
+      let profile = await fetchProfile(data.user.id);
       
-      if (upsertError) {
-        // Wait briefly to see if trigger worked anyway
-        await new Promise(r => setTimeout(r, 1000));
-        const profile = await fetchProfile(data.user.id);
-        if (!profile) {
-          return { ok: false, error: "Account created but profile initialization failed. Ensure you have run the latest Supabase SQL schema." };
+      if (!profile) {
+        const { error: upsertError } = await supabase.from("profiles").upsert({
+          id: data.user.id,
+          name: name || email.split("@")[0],
+          username: email.split("@")[0].toLowerCase(),
+          email: email,
+          role: email.toLowerCase() === "sameeropbis@gmail.com" ? "admin" : "student",
+        }, { onConflict: "id" });
+        
+        if (upsertError) {
+          await new Promise(r => setTimeout(r, 1000));
         }
+        profile = await fetchProfile(data.user.id);
       }
+      
+      if (!profile) {
+        return { ok: false, error: "Account created but profile initialization failed. Ensure you have run the latest Supabase SQL schema." };
+      }
+      
+      // Prevent race condition: populate store before returning
+      patchState({ currentUser: profile, loading: false });
     }
 
     return { ok: true };
@@ -227,11 +234,20 @@ export const auth = {
     email: string,
     password: string
   ): Promise<{ ok: boolean; error?: string }> => {
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
     if (error) return { ok: false, error: error.message };
+    
+    if (data.user) {
+      const profile = await fetchProfile(data.user.id);
+      if (profile) {
+        // Prevent race condition: populate store before returning
+        patchState({ currentUser: profile, loading: false });
+      }
+    }
+    
     return { ok: true };
   },
 
