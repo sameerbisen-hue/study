@@ -18,6 +18,7 @@ import Profile from "./pages/Profile.tsx";
 import Bookmarks from "./pages/Bookmarks.tsx";
 import AdminPanel from "./pages/admin/AdminPanel.tsx";
 import ReportManagement from "./pages/admin/ReportManagement.tsx";
+import Debug from "./pages/Debug.tsx";
 
 const queryClient = new QueryClient();
 
@@ -43,6 +44,7 @@ const App = () => (
             <Route path="/bookmarks" element={<Bookmarks />} />
             <Route path="/admin" element={<AdminPanel />} />
             <Route path="/admin/reports" element={<ReportManagement />} />
+            <Route path="/debug" element={<Debug />} />
           </Route>
 
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
