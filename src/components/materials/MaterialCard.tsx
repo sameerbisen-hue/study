@@ -23,12 +23,13 @@ export function MaterialCard({ material }: { material: Material }) {
   const me = useStore(select.currentUser);
   const bm = useStore(select.bookmarks);
   const Icon = fileIcon[material.fileType];
-  const upvoted = material.upvotedBy.includes(me.id);
+  const userId = me?.id;
+  const upvoted = userId ? material.upvotedBy.includes(userId) : false;
   const isBookmarked = bm.includes(material.id);
-  const canDelete = me.role === "admin" || material.uploaderId === me.id;
+  const canDelete = me ? me.role === "admin" || material.uploaderId === me.id : false;
 
-  const handleDelete = () => {
-    const ok = materials.removeIfAllowed(material.id);
+  const handleDelete = async () => {
+    const ok = await materials.removeIfAllowed(material.id);
     if (ok) toast({ title: "Material deleted", description: material.title });
   };
 

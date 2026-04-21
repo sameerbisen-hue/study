@@ -65,25 +65,87 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let isMounted = true;
 
-    const loadProfile = async (userId: string, userMeta: any) => {
-      let profile = await fetchProfile(userId);
-      if (!profile) {
-        // Fallback: manually create if db trigger failed or if missing
-        await supabase.from("profiles").upsert({
-          id: userId,
-          name: userMeta?.name || userMeta?.email?.split("@")[0] || "User",
-          username: (userMeta?.email?.split("@")[0] || "user").toLowerCase(),
-          email: userMeta?.email || "",
-          role: userMeta?.email?.toLowerCase() === "sameeropbis@gmail.com" ? "admin" : "student",
-        }, { onConflict: "id" });
-        profile = await fetchProfile(userId);
+    const syncAuthState = async () => {
+      try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        if (!isMounted) return;
+
+        if (!session?.user) {
+          patchState({ currentUser: null, loading: false, bookmarks: [] });
+          return;
+        }
+
+        const {
+          data: { user },
+          error,
+        } = await supabase.auth.getUser();
+        if (!isMounted) return;
+
+        if (error || !user) {
+          await supabase.auth.signOut();
+          if (!isMounted) return;
+          patchState({ currentUser: null, loading: false, bookmarks: [] });
+          return;
+        }
+
+        const profile = await ensureProfile({
+          userId: user.id,
+          email: user.email,
+          name:
+            typeof user.user_metadata?.name === "string"
+              ? user.user_metadata.name
+              : null,
+        });
+        if (!isMounted) return;
+
+        if (!profile) {
+          patchState({ currentUser: null, loading: false, bookmarks: [] });
+          return;
+        }
+
+        patchState({ currentUser: profile, loading: false });
+        await bookmarks.loadForUser(profile.id);
+      } catch {
+        if (!isMounted) return;
+        patchState({ currentUser: null, loading: false, bookmarks: [] });
       }
-      return profile;
     };
+
+    const loadProfile = async (
+      userId: string,
+      userMeta: { name?: string | null; email?: string | null }
+    ) =>
+      ensureProfile({
+        userId,
+        email: userMeta.email,
+        name: userMeta.name,
+      });
+
+    void syncAuthState();
 
     const { data: listener } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (!isMounted) return;
+
+        if (event === "SIGNED_OUT") {
+          patchState({
+            currentUser: null,
+            loading: false,
+            bookmarks: [],
+            materials: [],
+          });
+          return;
+        }
+
+        if (event === "TOKEN_REFRESHED") {
+          return;
+        }
+
+        patchState({ loading: true });
+        await syncAuthState();
+        return;
 
         // On sign-out, clear everything immediately
         if (event === "SIGNED_OUT") {
@@ -312,6 +374,7 @@ export const auth = {
 
     if (profile && data.session) {
       patchState({ currentUser: profile, loading: false });
+      await bookmarks.loadForUser(profile.id);
       return {
         ok: true,
         nextStep: "dashboard",
@@ -363,6 +426,7 @@ export const auth = {
       }
 
       patchState({ currentUser: profile, loading: false });
+      await bookmarks.loadForUser(profile.id);
     }
     
     return { ok: true };

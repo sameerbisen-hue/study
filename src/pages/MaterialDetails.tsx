@@ -49,7 +49,13 @@ export default function MaterialDetails() {
     );
   }
 
-  if (!me) return null;
+  if (!me) {
+    return (
+      <div className="min-h-[40vh] flex items-center justify-center">
+        <div className="h-8 w-8 rounded-full border-4 border-primary border-t-transparent animate-spin" />
+      </div>
+    );
+  }
 
   const upvoted = material.upvotedBy.includes(me.id);
   const isBookmarked = bm.includes(material.id);
