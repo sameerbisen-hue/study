@@ -63,30 +63,35 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   _state = state;
 
   useEffect(() => {
-    const { data: listener } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
-        if (session?.user) {
-          const profile = await fetchProfile(session.user.id);
-          patchState({ currentUser: profile, loading: false });
-          if (profile) {
-            await bookmarks.loadForUser(profile.id);
-          }
-        } else {
-          patchState({ currentUser: null, loading: false, bookmarks: [] });
+    const handleSession = async (session: any) => {
+      if (session?.user) {
+        let profile = await fetchProfile(session.user.id);
+        if (!profile) {
+          // Fallback: manually create if db trigger failed or if missing
+          await supabase.from("profiles").upsert({
+            id: session.user.id,
+            name: session.user.user_metadata?.name || session.user.email?.split("@")[0] || "User",
+            username: (session.user.email?.split("@")[0] || "user").toLowerCase(),
+            email: session.user.email || "",
+            role: session.user.email?.toLowerCase() === "sameeropbis@gmail.com" ? "admin" : "student",
+          }, { onConflict: "id" });
+          profile = await fetchProfile(session.user.id);
         }
-      }
-    );
-    supabase.auth.getSession().then(async ({ data }) => {
-      if (data.session?.user) {
-        const profile = await fetchProfile(data.session.user.id);
         patchState({ currentUser: profile, loading: false });
         if (profile) {
           await bookmarks.loadForUser(profile.id);
         }
       } else {
-        patchState({ loading: false });
+        patchState({ currentUser: null, loading: false, bookmarks: [] });
       }
-    });
+    };
+
+    const { data: listener } = supabase.auth.onAuthStateChange(
+      async (_event, session) => handleSession(session)
+    );
+    
+    supabase.auth.getSession().then(({ data }) => handleSession(data.session));
+    
     return () => listener.subscription.unsubscribe();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -197,13 +202,22 @@ export const auth = {
 
     // Manually create profile in case the DB trigger doesn't fire
     if (data.user) {
-      await supabase.from("profiles").upsert({
+      const { error: upsertError } = await supabase.from("profiles").upsert({
         id: data.user.id,
         name: name || email.split("@")[0],
         username: email.split("@")[0].toLowerCase(),
         email: email,
         role: email.toLowerCase() === "sameeropbis@gmail.com" ? "admin" : "student",
       }, { onConflict: "id" });
+      
+      if (upsertError) {
+        // Wait briefly to see if trigger worked anyway
+        await new Promise(r => setTimeout(r, 1000));
+        const profile = await fetchProfile(data.user.id);
+        if (!profile) {
+          return { ok: false, error: "Account created but profile initialization failed. Ensure you have run the latest Supabase SQL schema." };
+        }
+      }
     }
 
     return { ok: true };

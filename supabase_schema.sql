@@ -30,6 +30,9 @@ create policy "profiles: public read"
 create policy "profiles: owner update"
   on public.profiles for update using (auth.uid() = id);
 
+create policy "profiles: owner insert"
+  on public.profiles for insert with check (auth.uid() = id);
+
 -- ── materials ─────────────────────────────────────────────────
 create table if not exists public.materials (
   id             uuid primary key default gen_random_uuid(),
