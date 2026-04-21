@@ -17,7 +17,7 @@ import MaterialDetails from "./pages/MaterialDetails.tsx";
 import Leaderboard from "./pages/Leaderboard.tsx";
 import Profile from "./pages/Profile.tsx";
 import Bookmarks from "./pages/Bookmarks.tsx";
-import AdminPanel from "./pages/admin/AdminPanel.tsx";
+import AdminProtected from "./pages/admin/AdminProtected.tsx";
 import ReportManagement from "./pages/admin/ReportManagement.tsx";
 import Debug from "./pages/Debug.tsx";
 import AppErrorBoundary from "./components/AppErrorBoundary.tsx";
@@ -45,7 +45,7 @@ const App = () => (
               <Route path="/leaderboard" element={<Leaderboard />} />
               <Route path="/profile" element={<Profile />} />
               <Route path="/bookmarks" element={<Bookmarks />} />
-              <Route path="/admin" element={<AdminPanel />} />
+              <Route path="/admin" element={<AdminProtected />} />
               <Route path="/admin/reports" element={<ReportManagement />} />
               <Route path="/debug" element={<Debug />} />
             </Route>
