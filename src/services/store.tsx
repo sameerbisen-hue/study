@@ -180,6 +180,16 @@ function rowToUser(row: any): User {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function rowToMaterial(row: any): Material {
+  const rawFileType = typeof row.file_type === "string" ? row.file_type : "pdf";
+  const fileType: FileType =
+    rawFileType === "pdf" ||
+    rawFileType === "docx" ||
+    rawFileType === "ppt" ||
+    rawFileType === "image" ||
+    rawFileType === "notes"
+      ? rawFileType
+      : "notes";
+
   return {
     id: row.id,
     title: row.title || "",
@@ -187,7 +197,7 @@ function rowToMaterial(row: any): Material {
     semester: row.semester || "",
     description: row.description || "",
     tags: row.tags || [],
-    fileType: row.file_type || "pdf",
+    fileType,
     fileName: row.file_name || "",
     fileSize: row.file_size || "",
     filePath: row.file_path || undefined,

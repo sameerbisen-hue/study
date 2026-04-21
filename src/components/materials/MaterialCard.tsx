@@ -22,7 +22,7 @@ const fileIcon = {
 export function MaterialCard({ material }: { material: Material }) {
   const me = useStore(select.currentUser);
   const bm = useStore(select.bookmarks);
-  const Icon = fileIcon[material.fileType];
+  const Icon = fileIcon[material.fileType] ?? StickyNote;
   const userId = me?.id;
   const upvoted = userId ? material.upvotedBy.includes(userId) : false;
   const isBookmarked = bm.includes(material.id);
@@ -43,7 +43,7 @@ export function MaterialCard({ material }: { material: Material }) {
             </div>
             <div className="flex flex-col">
               <Badge variant="secondary" className="w-fit text-[10px] uppercase tracking-wide">
-                {fileTypeLabel[material.fileType]}
+                {fileTypeLabel[material.fileType] ?? "Notes"}
               </Badge>
             </div>
           </div>
