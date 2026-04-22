@@ -65,10 +65,16 @@ export default function AppLayout() {
               onClick={() => navigate("/profile")}
               className="flex items-center gap-2 rounded-full pl-2 pr-1 py-1 hover:bg-muted transition"
             >
-              <span className="hidden sm:block text-sm font-medium">{me.name}</span>
+              <span className="hidden sm:block text-sm font-medium">
+                {me.name && me.name.trim() && me.name !== "User" ? me.name : me.email?.split("@")[0] || "User"}
+              </span>
               <Avatar className="h-8 w-8">
                 <AvatarFallback className="bg-gradient-primary text-primary-foreground text-xs">
-                  {me.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
+                  {(() => {
+                    const displayName = me.name && me.name.trim() && me.name !== "User" ? me.name : me.email?.split("@")[0] || "User";
+                    const initials = displayName.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
+                    return initials || "U";
+                  })()}
                 </AvatarFallback>
               </Avatar>
             </button>

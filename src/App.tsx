@@ -12,7 +12,7 @@ import ForgotPassword from "./pages/auth/ForgotPassword.tsx";
 import AppLayout from "./components/layout/AppLayout.tsx";
 import Dashboard from "./pages/Dashboard.tsx";
 import Library from "./pages/Library.tsx";
-import Upload from "./pages/Upload.tsx";
+import UploadRouter from "./components/UploadRouter.tsx";
 import MaterialDetails from "./pages/MaterialDetails.tsx";
 import Leaderboard from "./pages/Leaderboard.tsx";
 import Profile from "./pages/Profile.tsx";
@@ -40,7 +40,7 @@ const App = () => (
             <Route element={<AppLayout />}>
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/library" element={<Library />} />
-              <Route path="/upload" element={<Upload />} />
+              <Route path="/upload" element={<UploadRouter />} />
               <Route path="/material/:id" element={<MaterialDetails />} />
               <Route path="/leaderboard" element={<Leaderboard />} />
               <Route path="/profile" element={<Profile />} />
