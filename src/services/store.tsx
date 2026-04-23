@@ -165,6 +165,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
+  
   return <StoreContext.Provider value={state}>{children}</StoreContext.Provider>;
 }
 

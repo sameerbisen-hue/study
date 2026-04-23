@@ -1,5 +1,4 @@
-import { useEffect, useState } from "react";
-import { Analytics } from "@vercel/analytics/react";
+import { useEffect, useState, useCallback } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -22,17 +21,22 @@ import AdminProtected from "./pages/admin/AdminProtected.tsx";
 import ReportManagement from "./pages/admin/ReportManagement.tsx";
 import Debug from "./pages/Debug.tsx";
 import EnhancedErrorBoundary from "./components/EnhancedErrorBoundary.tsx";
+import { Analytics } from "@vercel/analytics/react";
 
 const queryClient = new QueryClient();
 
-// Navigation wrapper component to handle tab switching
-function NavigationWrapper({ children }: { children: React.ReactNode }) {
+interface NavigationAwareAppProps {
+  children: React.ReactNode;
+}
+
+function NavigationAwareApp({ children }: NavigationAwareAppProps) {
   const [isVisible, setIsVisible] = useState(true);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [lastActiveTime, setLastActiveTime] = useState(Date.now());
   const [appReady, setAppReady] = useState(false);
 
+  // Handle page visibility changes (tab switching)
   useEffect(() => {
-    // Handle page visibility changes (tab switching)
     const handleVisibilityChange = () => {
       const nowVisible = !document.hidden;
       setIsVisible(nowVisible);
@@ -55,26 +59,42 @@ function NavigationWrapper({ children }: { children: React.ReactNode }) {
 
     // Handle online/offline events
     const handleOnline = () => {
+      setIsOnline(true);
       console.log("Network: Online");
     };
 
     const handleOffline = () => {
+      setIsOnline(false);
       console.log("Network: Offline");
+    };
+
+    // Handle focus/blur events
+    const handleFocus = () => {
+      console.log("Window gained focus");
+      setLastActiveTime(Date.now());
+    };
+
+    const handleBlur = () => {
+      console.log("Window lost focus");
     };
 
     // Add event listeners
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
+    window.addEventListener('focus', handleFocus);
+    window.addEventListener('blur', handleBlur);
 
     // Initial setup
     setAppReady(true);
-    console.log("Navigation wrapper initialized");
+    console.log("NavigationAwareApp initialized");
 
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('blur', handleBlur);
     };
   }, [lastActiveTime]);
 
@@ -97,6 +117,9 @@ function NavigationWrapper({ children }: { children: React.ReactNode }) {
         <div className="text-center space-y-4">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
           <p className="text-sm text-muted-foreground">Loading application...</p>
+          {!isOnline && (
+            <p className="text-xs text-red-600">No internet connection</p>
+          )}
         </div>
       </div>
     );
@@ -108,6 +131,7 @@ function NavigationWrapper({ children }: { children: React.ReactNode }) {
       {process.env.NODE_ENV === 'development' && (
         <div className="fixed top-0 right-0 z-50 bg-black/80 text-white text-xs p-2 rounded-bl-lg">
           <div>Visible: {isVisible ? 'Yes' : 'No'}</div>
+          <div>Online: {isOnline ? 'Yes' : 'No'}</div>
           <div>Active: {Math.floor((Date.now() - lastActiveTime) / 1000)}s ago</div>
         </div>
       )}
@@ -118,11 +142,11 @@ function NavigationWrapper({ children }: { children: React.ReactNode }) {
 
 const App = () => (
   <EnhancedErrorBoundary>
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <NavigationWrapper>
+    <NavigationAwareApp>
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
           <BrowserRouter>
             <Routes>
               <Route path="/" element={<Index />} />
@@ -147,9 +171,9 @@ const App = () => (
             </Routes>
           </BrowserRouter>
           <Analytics />
-        </NavigationWrapper>
-      </TooltipProvider>
-    </QueryClientProvider>
+        </TooltipProvider>
+      </QueryClientProvider>
+    </NavigationAwareApp>
   </EnhancedErrorBoundary>
 );
 
