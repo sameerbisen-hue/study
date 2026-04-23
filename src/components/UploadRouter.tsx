@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import Upload from "../pages/Upload";
-import UploadMobile from "../pages/UploadMobile";
+import UploadMobileEnhanced from "../pages/UploadMobileEnhanced";
 
 export default function UploadRouter() {
   const [isMobile, setIsMobile] = useState(false);
@@ -16,5 +16,5 @@ export default function UploadRouter() {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  return isMobile ? <UploadMobile /> : <Upload />;
+  return isMobile ? <UploadMobileEnhanced /> : <Upload />;
 }

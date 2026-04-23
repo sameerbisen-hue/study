@@ -20,12 +20,12 @@ import Bookmarks from "./pages/Bookmarks.tsx";
 import AdminProtected from "./pages/admin/AdminProtected.tsx";
 import ReportManagement from "./pages/admin/ReportManagement.tsx";
 import Debug from "./pages/Debug.tsx";
-import AppErrorBoundary from "./components/AppErrorBoundary.tsx";
+import EnhancedErrorBoundary from "./components/EnhancedErrorBoundary.tsx";
 
 const queryClient = new QueryClient();
 
 const App = () => (
-  <AppErrorBoundary>
+  <EnhancedErrorBoundary>
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <Toaster />
@@ -56,7 +56,7 @@ const App = () => (
         <Analytics />
       </TooltipProvider>
     </QueryClientProvider>
-  </AppErrorBoundary>
+  </EnhancedErrorBoundary>
 );
 
 export default App;
