@@ -159,7 +159,11 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       // Prevent multiple concurrent syncs
       if (_state.loading) return;
 
-      patchState({ loading: true });
+      // Only set loading to true if we don't have a user yet
+      // This prevents blocking UI on page revisit when user is already authenticated
+      if (!_state.currentUser) {
+        patchState({ loading: true });
+      }
 
       try {
         await syncAuthState();

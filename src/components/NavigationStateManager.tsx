@@ -24,10 +24,11 @@ export function NavigationStateManager({ children }: NavigationStateManagerProps
     const handleVisibilityChange = () => {
       const isVisible = !document.hidden;
 
-      // Only check auth if becoming visible after being hidden, but don't block UI
+      // When page becomes visible after being hidden, ensure we're ready
       if (isVisible && !lastVisibilityRef.current) {
         console.log("Page became visible");
-        // Auth state will be updated via listener, no need to check here
+        // Immediately set ready - don't block UI on revisit
+        safeSetReady(true);
       }
 
       lastVisibilityRef.current = isVisible;
