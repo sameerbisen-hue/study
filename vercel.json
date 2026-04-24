@@ -1,5 +1,8 @@
 {
   "rewrites": [
-    { "source": "/(.*)", "destination": "/index.html" }
+    {
+      "source": "/((?!api|static|_next|_vercel|.*\\..*).*)",
+      "destination": "/index.html"
+    }
   ]
 }
