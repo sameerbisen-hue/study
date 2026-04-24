@@ -235,17 +235,6 @@ export default function Upload() {
     setProgress(10);
 
     try {
-      const { data: buckets, error: bucketError } = await supabase.storage.listBuckets();
-
-      if (bucketError) {
-        throw new Error(`Storage access error: ${bucketError.message}`);
-      }
-
-      const materialsBucket = buckets?.find(b => b.name === 'materials');
-      if (!materialsBucket) {
-        throw new Error("Materials storage bucket not found");
-      }
-
       const newMat = await materials.upload({
         title: title.trim(),
         subject: subject.trim(),
@@ -273,9 +262,7 @@ export default function Upload() {
 
       let userFriendlyMessage = "Upload failed. Please try again.";
 
-      if (errorMessage.includes("Bucket not found") || errorMessage.includes("storage")) {
-        userFriendlyMessage = "Storage configuration error. Please contact support.";
-      } else if (errorMessage.includes("row-level security") || errorMessage.includes("permission")) {
+      if (errorMessage.includes("row-level security") || errorMessage.includes("permission")) {
         userFriendlyMessage = "Permission denied. Please sign in again.";
         setSessionExpired(true);
       } else if (errorMessage.includes("network") || errorMessage.includes("connection")) {
@@ -284,6 +271,8 @@ export default function Upload() {
         userFriendlyMessage = "Upload timeout. Try with a smaller file.";
       } else if (errorMessage.includes("large") || errorMessage.includes("size")) {
         userFriendlyMessage = "File too large. Please use a smaller file.";
+      } else if (errorMessage.includes("bucket") || errorMessage.includes("storage")) {
+        userFriendlyMessage = "Storage error. The upload bucket may not be configured.";
       }
 
       toast({
