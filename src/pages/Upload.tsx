@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useStore } from "@/services/store";
 import { Upload as UploadIcon, FileUp, X, LogOut, FileText, Image as ImageIcon, Presentation, File as FileIcon, CheckCircle, AlertCircle, ArrowLeft, ArrowRight, Sparkles } from "lucide-react";
@@ -367,10 +367,12 @@ export default function Upload() {
     </div>
   );
 
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const renderFileStep = () => (
     <div className="space-y-6">
-      <div
-        onClick={() => document.getElementById('file-upload')?.click()}
+      <label
+        htmlFor="file-upload"
         onDragEnter={handleDrag}
         onDragLeave={handleDrag}
         onDragOver={handleDrag}
@@ -402,14 +404,18 @@ export default function Upload() {
         <p className="text-xs text-muted-foreground">
           Max file size: {isMobile ? "25MB" : "50MB"}
         </p>
-        <Input
+        <input
+          ref={fileInputRef}
           id="file-upload"
           type="file"
-          className="hidden"
-          onChange={(e) => onFile(e.target.files?.[0] || undefined)}
+          className="sr-only"
+          onChange={(e) => {
+            onFile(e.target.files?.[0] || undefined);
+            e.target.value = ''; // Reset for same file selection
+          }}
           accept=".pdf,.doc,.docx,.ppt,.pptx,.png,.jpg,.jpeg,.webp,.md,.txt,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,image/*,text/plain,text/markdown"
         />
-      </div>
+      </label>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
