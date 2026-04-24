@@ -829,7 +829,7 @@ export const users = {
 
     const { error } = await supabase
       .from("profiles")
-      .update({ role: "admin", updated_at: new Date().toISOString() })
+      .update({ role: "admin" })
       .eq("id", id);
 
     if (error) {
