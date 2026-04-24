@@ -44,6 +44,16 @@ let _state: StoreState = defaultState;
 
 const StoreContext = createContext<StoreState>(defaultState);
 
+function timeoutAfter(ms: number, message: string) {
+  return new Promise<never>((_, reject) => {
+    setTimeout(() => reject(new Error(message)), ms);
+  });
+}
+
+async function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
+  return Promise.race([promise, timeoutAfter(ms, message)]);
+}
+
 function patchState(patch: Partial<StoreState>) {
   _setState((prev) => {
     const next = { ...prev, ...patch };
@@ -71,8 +81,11 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
     const syncAuthState = async () => {
       try {
-        // Quick session check - no timeout since Supabase handles this internally
-        const { data: { session } } = await supabase.auth.getSession();
+        const { data: { session } } = await withTimeout(
+          supabase.auth.getSession(),
+          7000,
+          "Timed out while checking your session"
+        );
         if (!isMounted) return;
 
         if (!session?.user) {
@@ -80,8 +93,11 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           return;
         }
 
-        // Get user - no timeout, let it complete naturally
-        const { data: { user }, error } = await supabase.auth.getUser();
+        const { data: { user }, error } = await withTimeout(
+          supabase.auth.getUser(),
+          7000,
+          "Timed out while validating your user"
+        );
         if (!isMounted) return;
 
         if (error || !user) {
@@ -92,14 +108,18 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         }
 
         // Ensure profile exists
-        const profile = await ensureProfile({
+        const profile = await withTimeout(
+          ensureProfile({
           userId: user.id,
           email: user.email,
           name:
             typeof user.user_metadata?.name === "string"
               ? user.user_metadata.name
               : null,
-        });
+          }),
+          10000,
+          "Timed out while loading your profile"
+        );
 
         if (!isMounted) return;
 

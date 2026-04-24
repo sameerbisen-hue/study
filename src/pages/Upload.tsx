@@ -163,6 +163,8 @@ export default function Upload() {
       'image/jpeg': 'jpg',
       'image/jpg': 'jpg',
       'image/webp': 'webp',
+      'image/heic': 'heic',
+      'image/heif': 'heif',
       'text/markdown': 'md',
       'text/plain': 'txt',
       'application/octet-stream': fileExtension, // Fallback to extension for generic type
@@ -174,7 +176,7 @@ export default function Upload() {
       detectedExt = mimeToExt[f.type] || fileExtension;
     }
 
-    const allowedTypes = ['pdf', 'docx', 'doc', 'ppt', 'pptx', 'png', 'jpg', 'jpeg', 'webp', 'md', 'txt'];
+    const allowedTypes = ['pdf', 'docx', 'doc', 'ppt', 'pptx', 'png', 'jpg', 'jpeg', 'webp', 'heic', 'heif', 'md', 'txt'];
 
     if (!detectedExt || !allowedTypes.includes(detectedExt)) {
       toast({
@@ -190,7 +192,7 @@ export default function Upload() {
     if (ext === "pdf") setFileType("pdf");
     else if (ext === "docx" || ext === "doc") setFileType("docx");
     else if (ext === "ppt" || ext === "pptx") setFileType("ppt");
-    else if (["png", "jpg", "jpeg", "webp"].includes(ext)) setFileType("image");
+    else if (["png", "jpg", "jpeg", "webp", "heic", "heif"].includes(ext)) setFileType("image");
     else setFileType("notes");
 
     // Auto-set title from filename if empty
@@ -449,7 +451,7 @@ export default function Upload() {
             onFile(e.target.files?.[0] || undefined);
             e.target.value = ''; // Reset for same file selection
           }}
-          accept=".pdf,.doc,.docx,.ppt,.pptx,.png,.jpg,.jpeg,.webp,.md,.txt,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,image/*,text/plain,text/markdown"
+          accept=".pdf,.doc,.docx,.ppt,.pptx,.png,.jpg,.jpeg,.webp,.heic,.heif,.md,.txt,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,image/*,image/heic,image/heif,text/plain,text/markdown"
         />
       </label>
 
