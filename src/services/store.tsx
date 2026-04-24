@@ -825,21 +825,35 @@ export const users = {
 
   makeAdmin: async (id: string) => {
     const user = _state.users.find((u) => u.id === id);
-    if (!user) return;
+    if (!user) throw new Error("User not found");
 
-    const { error } = await supabase
+    console.log("Making user admin:", id);
+
+    const { data, error } = await supabase
       .from("profiles")
       .update({ role: "admin" })
-      .eq("id", id);
+      .eq("id", id)
+      .select();
 
     if (error) {
       console.error("Failed to make user admin:", error);
       throw new Error(`Failed to update user role: ${error.message}`);
     }
 
+    console.log("Update result:", data);
+
+    if (!data || data.length === 0) {
+      console.error("No rows updated - check RLS permissions");
+      throw new Error("No rows updated. You may not have permission to modify this user.");
+    }
+
+    // Update local state with confirmed data
     patchState({
       users: _state.users.map((u) => (u.id === id ? { ...u, role: "admin" } : u)),
     });
+
+    // Force reload to verify change persisted
+    await users.loadAll();
   },
 };
 
