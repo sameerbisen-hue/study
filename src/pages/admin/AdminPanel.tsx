@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { Link } from "react-router-dom";
-import { ShieldCheck, Users, FileText, Flag, Trash2, Ban, CheckCircle } from "lucide-react";
+import { ShieldCheck, Users, FileText, Flag, Trash2, Ban, CheckCircle, Shield } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -111,6 +111,7 @@ export default function AdminPanel() {
                     <TableHead>Name</TableHead>
                     <TableHead>Email</TableHead>
                     <TableHead>Uploads</TableHead>
+                    <TableHead>Role</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
@@ -122,22 +123,43 @@ export default function AdminPanel() {
                       <TableCell className="text-muted-foreground">{u.email}</TableCell>
                       <TableCell>{u.uploadCount}</TableCell>
                       <TableCell>
+                        {u.role === "admin" ? (
+                          <Badge variant="default" className="bg-primary"><Shield className="h-3 w-3 mr-1" /> Admin</Badge>
+                        ) : (
+                          <Badge variant="outline">Student</Badge>
+                        )}
+                      </TableCell>
+                      <TableCell>
                         {u.blocked ? <Badge variant="destructive">Blocked</Badge> : <Badge variant="secondary">Active</Badge>}
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button
-                          size="sm"
-                          variant={u.blocked ? "outline" : "ghost"}
-                          className={u.blocked ? "text-success" : "text-destructive"}
-                          onClick={async () => {
-                            await users.toggleBlock(u.id);
-                            toast({ title: u.blocked ? "User unblocked" : "User blocked", description: u.name });
-                          }}
-                        >
-                          {u.blocked
-                            ? <><CheckCircle className="h-4 w-4" /> Unblock</>
-                            : <><Ban className="h-4 w-4" /> Block</>}
-                        </Button>
+                        <div className="flex items-center justify-end gap-2">
+                          {u.role !== "admin" && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={async () => {
+                                await users.makeAdmin(u.id);
+                                toast({ title: "Admin granted", description: `${u.name} is now an admin` });
+                              }}
+                            >
+                              <Shield className="h-4 w-4 mr-1" /> Make Admin
+                            </Button>
+                          )}
+                          <Button
+                            size="sm"
+                            variant={u.blocked ? "outline" : "ghost"}
+                            className={u.blocked ? "text-success" : "text-destructive"}
+                            onClick={async () => {
+                              await users.toggleBlock(u.id);
+                              toast({ title: u.blocked ? "User unblocked" : "User blocked", description: u.name });
+                            }}
+                          >
+                            {u.blocked
+                              ? <><CheckCircle className="h-4 w-4" /> Unblock</>
+                              : <><Ban className="h-4 w-4" /> Block</>}
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}

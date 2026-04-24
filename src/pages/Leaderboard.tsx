@@ -49,11 +49,19 @@ function LeaderTable({ users, metric, metricLabel }: { users: User[]; metric: ke
               <span className={`w-7 text-center text-sm font-bold ${i === 0 ? "text-warning" : "text-muted-foreground"}`}>#{i + 1}</span>
               <Avatar className="h-9 w-9">
                 <AvatarFallback className="bg-gradient-primary text-primary-foreground text-xs">
-                  {u.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
+                  {(() => {
+                    const displayName = u.name && u.name.trim() && u.name !== "User" ? u.name : u.email?.split("@")[0] || "User";
+                    return displayName.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
+                  })()}
                 </AvatarFallback>
               </Avatar>
               <div className="min-w-0">
-                <div className="font-medium truncate">{u.name}</div>
+                <div className="font-medium truncate">
+                  {u.name && u.name.trim() && u.name !== "User" ? u.name : u.email?.split("@")[0] || "User"}
+                </div>
+                {u.name && u.name.trim() && u.name !== "User" && u.email && (
+                  <div className="text-xs text-muted-foreground">{u.email}</div>
+                )}
               </div>
             </div>
             <div className="text-right">

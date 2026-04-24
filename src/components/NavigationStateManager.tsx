@@ -1,76 +1,110 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 
 interface NavigationStateManagerProps {
   children: React.ReactNode;
 }
 
+// Promise with timeout helper
+const withTimeout = <T,>(promise: Promise<T>, ms: number): Promise<T> => {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error("Timeout")), ms)
+    ),
+  ]);
+};
+
 export function NavigationStateManager({ children }: NavigationStateManagerProps) {
   const [isReady, setIsReady] = useState(false);
-  const [lastVisibility, setLastVisibility] = useState(!document.hidden);
+  const lastVisibilityRef = useRef(!document.hidden);
+  const checkInProgressRef = useRef(false);
+  const mountedRef = useRef(true);
 
   useEffect(() => {
     let timeoutId: NodeJS.Timeout;
+    let readyTimeoutId: NodeJS.Timeout;
+
+    const safeSetReady = (value: boolean) => {
+      if (mountedRef.current) {
+        setIsReady(value);
+      }
+    };
 
     const handleVisibilityChange = () => {
       const isVisible = !document.hidden;
-      
-      if (isVisible && !lastVisibility) {
-        // Page became visible (user switched back)
+
+      if (isVisible && !lastVisibilityRef.current) {
         console.log("Page became visible, checking authentication");
-        
-        // Add small delay to ensure browser is ready
+
         timeoutId = setTimeout(() => {
           checkAndRestoreAuth();
         }, 100);
       }
-      
-      setLastVisibility(isVisible);
+
+      lastVisibilityRef.current = isVisible;
     };
 
     const checkAndRestoreAuth = async () => {
+      if (checkInProgressRef.current) {
+        console.log("Auth check already in progress, skipping");
+        return;
+      }
+
+      checkInProgressRef.current = true;
+
       try {
-        // Check current session
-        const { data: { session }, error } = await supabase.auth.getSession();
-        
+        // Check session with 5 second timeout
+        const { data: { session }, error } = await withTimeout(
+          supabase.auth.getSession(),
+          5000
+        );
+
         if (error) {
           console.error("Session check error:", error);
-          setIsReady(true);
+          safeSetReady(true);
+          checkInProgressRef.current = false;
           return;
         }
 
         if (!session) {
           console.log("No session found, attempting to restore");
-          
-          // Try to get current user (might restore session)
-          const { data: { user } } = await supabase.auth.getUser();
-          
-          if (user) {
-            console.log("User found, session restored");
-          } else {
-            console.log("No user found, session lost");
+
+          // Try to get current user with timeout
+          try {
+            const { data: { user } } = await withTimeout(
+              supabase.auth.getUser(),
+              5000
+            );
+
+            if (user) {
+              console.log("User found, session restored");
+            } else {
+              console.log("No user found, session lost");
+            }
+          } catch (userError) {
+            console.log("User check timed out or failed");
           }
         } else {
           console.log("Session found and valid");
         }
-        
-        setIsReady(true);
-        
+
+        safeSetReady(true);
+
       } catch (error) {
         console.error("Auth restoration error:", error);
-        setIsReady(true);
+        safeSetReady(true);
+      } finally {
+        checkInProgressRef.current = false;
       }
     };
 
     // Add event listeners
     document.addEventListener('visibilitychange', handleVisibilityChange);
-    
-    // Initial check
-    checkAndRestoreAuth();
 
     // Handle page focus/blur as backup
     const handleFocus = () => {
-      if (!lastVisibility) {
+      if (!lastVisibilityRef.current && !checkInProgressRef.current) {
         console.log("Window gained focus");
         checkAndRestoreAuth();
       }
@@ -78,13 +112,27 @@ export function NavigationStateManager({ children }: NavigationStateManagerProps
 
     window.addEventListener('focus', handleFocus);
 
+    // Initial check - run once on mount only
+    checkAndRestoreAuth();
+
+    // Force ready after 8 seconds max (failsafe)
+    readyTimeoutId = setTimeout(() => {
+      if (!isReady && mountedRef.current) {
+        console.warn("NavigationStateManager: Forcing ready state after timeout");
+        safeSetReady(true);
+        checkInProgressRef.current = false;
+      }
+    }, 8000);
+
     // Cleanup
     return () => {
+      mountedRef.current = false;
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('focus', handleFocus);
       if (timeoutId) clearTimeout(timeoutId);
+      if (readyTimeoutId) clearTimeout(readyTimeoutId);
     };
-  }, [lastVisibility]);
+  }, []);
 
   // Show loading state while checking authentication
   if (!isReady) {

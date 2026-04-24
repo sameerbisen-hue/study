@@ -822,6 +822,16 @@ export const users = {
       users: _state.users.map((u) => (u.id === id ? { ...u, blocked } : u)),
     });
   },
+
+  makeAdmin: async (id: string) => {
+    const user = _state.users.find((u) => u.id === id);
+    if (!user) return;
+
+    await supabase.from("profiles").update({ role: "admin" }).eq("id", id);
+    patchState({
+      users: _state.users.map((u) => (u.id === id ? { ...u, role: "admin" } : u)),
+    });
+  },
 };
 
 export const bookmarks = {
