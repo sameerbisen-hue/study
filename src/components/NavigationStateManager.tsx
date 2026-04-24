@@ -68,16 +68,6 @@ export function NavigationStateManager({ children }: NavigationStateManagerProps
     // Add event listeners
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
-    // Handle page focus/blur as backup
-    const handleFocus = () => {
-      if (!lastVisibilityRef.current && !checkInProgressRef.current) {
-        console.log("Window gained focus");
-        checkAndRestoreAuth();
-      }
-    };
-
-    window.addEventListener('focus', handleFocus);
-
     // Initial check - run once on mount only
     checkAndRestoreAuth();
 
@@ -94,7 +84,6 @@ export function NavigationStateManager({ children }: NavigationStateManagerProps
     return () => {
       mountedRef.current = false;
       document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('focus', handleFocus);
       if (timeoutId) clearTimeout(timeoutId);
       if (readyTimeoutId) clearTimeout(readyTimeoutId);
     };
