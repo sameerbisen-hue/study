@@ -71,9 +71,12 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
     const syncAuthState = async () => {
       try {
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
+        // Quick session check with timeout
+        const sessionPromise = supabase.auth.getSession();
+        const sessionTimeout = new Promise<{data: {session: null}, error: Error}>((resolve) => 
+          setTimeout(() => resolve({data: {session: null}, error: new Error("Session check timeout")}), 5000)
+        );
+        const { data: { session } } = await Promise.race([sessionPromise, sessionTimeout]);
         if (!isMounted) return;
 
         if (!session?.user) {
@@ -81,10 +84,12 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           return;
         }
 
-        const {
-          data: { user },
-          error,
-        } = await supabase.auth.getUser();
+        // Get user with timeout
+        const userPromise = supabase.auth.getUser();
+        const userTimeout = new Promise<{data: {user: null}, error: Error}>((resolve) => 
+          setTimeout(() => resolve({data: {user: null}, error: new Error("User check timeout")}), 5000)
+        );
+        const { data: { user }, error } = await Promise.race([userPromise, userTimeout]);
         if (!isMounted) return;
 
         if (error || !user) {
@@ -159,8 +164,17 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       }
     });
 
+    // Failsafe: clear loading after 8 seconds max
+    const loadingTimeout = setTimeout(() => {
+      if (isMounted && _state.loading) {
+        console.warn("Store loading timeout reached, clearing loading state");
+        patchState({ loading: false });
+      }
+    }, 8000);
+
     return () => {
       isMounted = false;
+      clearTimeout(loadingTimeout);
       listener.subscription.unsubscribe();
     };
   }, []);

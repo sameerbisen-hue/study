@@ -5,16 +5,6 @@ interface NavigationStateManagerProps {
   children: React.ReactNode;
 }
 
-// Promise with timeout helper
-const withTimeout = <T,>(promise: Promise<T>, ms: number): Promise<T> => {
-  return Promise.race([
-    promise,
-    new Promise<T>((_, reject) =>
-      setTimeout(() => reject(new Error("Timeout")), ms)
-    ),
-  ]);
-};
-
 export function NavigationStateManager({ children }: NavigationStateManagerProps) {
   const [isReady, setIsReady] = useState(false);
   const lastVisibilityRef = useRef(!document.hidden);
@@ -34,12 +24,10 @@ export function NavigationStateManager({ children }: NavigationStateManagerProps
     const handleVisibilityChange = () => {
       const isVisible = !document.hidden;
 
+      // Only check auth if becoming visible after being hidden, but don't block UI
       if (isVisible && !lastVisibilityRef.current) {
-        console.log("Page became visible, checking authentication");
-
-        timeoutId = setTimeout(() => {
-          checkAndRestoreAuth();
-        }, 100);
+        console.log("Page became visible");
+        // Auth state will be updated via listener, no need to check here
       }
 
       lastVisibilityRef.current = isVisible;
@@ -54,45 +42,22 @@ export function NavigationStateManager({ children }: NavigationStateManagerProps
       checkInProgressRef.current = true;
 
       try {
-        // Check session with 5 second timeout
-        const { data: { session }, error } = await withTimeout(
-          supabase.auth.getSession(),
-          5000
-        );
+        // Quick session check - just verify we can talk to Supabase
+        // Don't block page load with complex auth checks
+        const { data: { session } } = await supabase.auth.getSession();
 
-        if (error) {
-          console.error("Session check error:", error);
-          safeSetReady(true);
-          checkInProgressRef.current = false;
-          return;
-        }
-
-        if (!session) {
-          console.log("No session found, attempting to restore");
-
-          // Try to get current user with timeout
-          try {
-            const { data: { user } } = await withTimeout(
-              supabase.auth.getUser(),
-              5000
-            );
-
-            if (user) {
-              console.log("User found, session restored");
-            } else {
-              console.log("No user found, session lost");
-            }
-          } catch (userError) {
-            console.log("User check timed out or failed");
-          }
+        if (session) {
+          console.log("Session found, user is authenticated");
         } else {
-          console.log("Session found and valid");
+          console.log("No session, user is not authenticated");
         }
 
+        // Always become ready after first check - auth state will update via listener
         safeSetReady(true);
 
       } catch (error) {
-        console.error("Auth restoration error:", error);
+        console.error("Auth check error:", error);
+        // Even on error, show the app - better UX than stuck loading
         safeSetReady(true);
       } finally {
         checkInProgressRef.current = false;
@@ -115,14 +80,14 @@ export function NavigationStateManager({ children }: NavigationStateManagerProps
     // Initial check - run once on mount only
     checkAndRestoreAuth();
 
-    // Force ready after 8 seconds max (failsafe)
+    // Force ready after 5 seconds max (failsafe) - use ref to avoid stale closure
     readyTimeoutId = setTimeout(() => {
-      if (!isReady && mountedRef.current) {
+      if (mountedRef.current) {
         console.warn("NavigationStateManager: Forcing ready state after timeout");
         safeSetReady(true);
         checkInProgressRef.current = false;
       }
-    }, 8000);
+    }, 5000);
 
     // Cleanup
     return () => {
