@@ -47,6 +47,7 @@ export default function Upload() {
   const [authStatus, setAuthStatus] = useState<'checking' | 'authenticated' | 'unauthenticated'>('checking');
   const [sessionExpired, setSessionExpired] = useState(false);
   const [dragActive, setDragActive] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Mobile detection
   useEffect(() => {
@@ -403,8 +404,6 @@ export default function Upload() {
       ))}
     </div>
   );
-
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const renderFileStep = () => (
     <div className="space-y-6">
