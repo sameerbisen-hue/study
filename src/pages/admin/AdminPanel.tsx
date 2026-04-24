@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { Link } from "react-router-dom";
-import { ShieldCheck, Users, FileText, Flag, Trash2, Ban, CheckCircle, Shield } from "lucide-react";
+import { ShieldCheck, Users, FileText, Flag, Trash2, Ban, CheckCircle, Shield, ShieldOff } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -134,7 +134,7 @@ export default function AdminPanel() {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-2">
-                          {u.role !== "admin" && (
+                          {u.role !== "admin" ? (
                             <Button
                               size="sm"
                               variant="outline"
@@ -149,6 +149,22 @@ export default function AdminPanel() {
                               }}
                             >
                               <Shield className="h-4 w-4 mr-1" /> Make Admin
+                            </Button>
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={async () => {
+                                try {
+                                  await users.removeAdmin(u.id);
+                                  toast({ title: "Admin removed", description: `${u.name} is now a student` });
+                                } catch (err) {
+                                  const message = err instanceof Error ? err.message : "Failed to remove admin";
+                                  toast({ title: "Error", description: message, variant: "destructive" });
+                                }
+                              }}
+                            >
+                              <ShieldOff className="h-4 w-4 mr-1" /> Remove Admin
                             </Button>
                           )}
                           <Button

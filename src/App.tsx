@@ -4,7 +4,6 @@ import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { NavigationStateManager } from "./components/NavigationStateManager";
 import Index from "./pages/Index.tsx";
 import NotFound from "./pages/NotFound.tsx";
 import Login from "./pages/auth/Login.tsx";
@@ -31,32 +30,30 @@ const App = () => (
       <TooltipProvider>
         <Toaster />
         <Sonner />
-        <NavigationStateManager>
-          <BrowserRouter>
-            <Routes>
-              <Route path="/" element={<Index />} />
-              <Route path="/login" element={<Login />} />
-              <Route path="/signup" element={<Signup />} />
-              <Route path="/forgot-password" element={<ForgotPassword />} />
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<Index />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/signup" element={<Signup />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
 
-              <Route element={<AppLayout />}>
-                <Route path="/dashboard" element={<Dashboard />} />
-                <Route path="/library" element={<Library />} />
-                <Route path="/upload" element={<UploadRouter />} />
-                <Route path="/material/:id" element={<MaterialDetails />} />
-                <Route path="/leaderboard" element={<Leaderboard />} />
-                <Route path="/profile" element={<Profile />} />
-                <Route path="/bookmarks" element={<Bookmarks />} />
-                <Route path="/admin" element={<AdminProtected />} />
-                <Route path="/admin/reports" element={<ReportManagement />} />
-                <Route path="/debug" element={<Debug />} />
-              </Route>
+            <Route element={<AppLayout />}>
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/library" element={<Library />} />
+              <Route path="/upload" element={<UploadRouter />} />
+              <Route path="/material/:id" element={<MaterialDetails />} />
+              <Route path="/leaderboard" element={<Leaderboard />} />
+              <Route path="/profile" element={<Profile />} />
+              <Route path="/bookmarks" element={<Bookmarks />} />
+              <Route path="/admin" element={<AdminProtected />} />
+              <Route path="/admin/reports" element={<ReportManagement />} />
+              <Route path="/debug" element={<Debug />} />
+            </Route>
 
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </BrowserRouter>
-          <Analytics />
-        </NavigationStateManager>
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </BrowserRouter>
+        <Analytics />
       </TooltipProvider>
     </QueryClientProvider>
   </EnhancedErrorBoundary>

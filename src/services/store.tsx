@@ -71,12 +71,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
     const syncAuthState = async () => {
       try {
-        // Quick session check with timeout
-        const sessionPromise = supabase.auth.getSession();
-        const sessionTimeout = new Promise<{data: {session: null}, error: Error}>((resolve) => 
-          setTimeout(() => resolve({data: {session: null}, error: new Error("Session check timeout")}), 5000)
-        );
-        const { data: { session } } = await Promise.race([sessionPromise, sessionTimeout]);
+        // Quick session check - no timeout since Supabase handles this internally
+        const { data: { session } } = await supabase.auth.getSession();
         if (!isMounted) return;
 
         if (!session?.user) {
@@ -84,12 +80,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           return;
         }
 
-        // Get user with timeout
-        const userPromise = supabase.auth.getUser();
-        const userTimeout = new Promise<{data: {user: null}, error: Error}>((resolve) => 
-          setTimeout(() => resolve({data: {user: null}, error: new Error("User check timeout")}), 5000)
-        );
-        const { data: { user }, error } = await Promise.race([userPromise, userTimeout]);
+        // Get user - no timeout, let it complete naturally
+        const { data: { user }, error } = await supabase.auth.getUser();
         if (!isMounted) return;
 
         if (error || !user) {
@@ -99,8 +91,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           return;
         }
 
-        // Add timeout for profile creation
-        const profilePromise = ensureProfile({
+        // Ensure profile exists
+        const profile = await ensureProfile({
           userId: user.id,
           email: user.email,
           name:
@@ -109,22 +101,16 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
               : null,
         });
 
-        const timeoutPromise = new Promise<null>((_, reject) => 
-          setTimeout(() => reject(new Error("Profile creation timeout")), 10000)
-        );
-
-        const profile = await Promise.race([profilePromise, timeoutPromise]).catch(() => null);
-        
         if (!isMounted) return;
 
         if (!profile) {
-          console.warn("Profile creation failed or timed out");
+          console.warn("Profile creation failed");
           clearAuthState();
           return;
         }
 
         patchState({ currentUser: profile, loading: false });
-        
+
         // Load bookmarks in background without blocking
         bookmarks.loadForUser(profile.id).catch(error => {
           console.error("Failed to load bookmarks:", error);
@@ -152,9 +138,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
       // Prevent multiple concurrent syncs
       if (_state.loading) return;
-      
+
       patchState({ loading: true });
-      
+
       try {
         await syncAuthState();
       } catch (error) {
@@ -164,17 +150,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       }
     });
 
-    // Failsafe: clear loading after 8 seconds max
-    const loadingTimeout = setTimeout(() => {
-      if (isMounted && _state.loading) {
-        console.warn("Store loading timeout reached, clearing loading state");
-        patchState({ loading: false });
-      }
-    }, 8000);
-
     return () => {
       isMounted = false;
-      clearTimeout(loadingTimeout);
       listener.subscription.unsubscribe();
     };
   }, []);
@@ -516,11 +493,20 @@ export const materials = {
     fileSize: string;
     file: File;
   }): Promise<Material> => {
+    console.log("Upload started:", { fileName: data.fileName, fileSize: data.fileSize, fileType: data.fileType });
+
     const me = await resolveCurrentUserProfile();
-    if (!me) throw new Error("Please sign in again before uploading.");
+    if (!me) {
+      console.error("Upload failed: No current user profile");
+      throw new Error("Please sign in again before uploading.");
+    }
+
+    console.log("User profile found:", me.id, me.name);
 
     const safeFileName = data.fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
     const storagePath = `${me.id}/${Date.now()}-${safeFileName}`;
+
+    console.log("Storage path:", storagePath);
 
     // Detect content type for mobile uploads where file.type might be empty
     const mimeTypes: Record<FileType, string> = {
@@ -534,7 +520,7 @@ export const materials = {
     const contentType = data.file.type || mimeTypes[data.fileType] || 'application/octet-stream';
     console.log("Uploading with content type:", contentType, "File type:", data.fileType);
 
-    const { error: storageError } = await supabase.storage
+    const { error: storageError, data: storageData } = await supabase.storage
       .from("materials")
       .upload(storagePath, data.file, {
         upsert: false,
@@ -542,8 +528,11 @@ export const materials = {
       });
 
     if (storageError) {
+      console.error("Storage upload error:", storageError);
       throw new Error("File upload failed: " + storageError.message);
     }
+
+    console.log("Storage upload successful:", storageData);
 
     const { data: row, error } = await supabase
       .from("materials")
@@ -565,19 +554,28 @@ export const materials = {
       .single();
 
     if (error) {
+      console.error("Database insert error:", error);
       await supabase.storage.from("materials").remove([storagePath]);
-      throw new Error(error.message);
+      throw new Error("Database insert failed: " + error.message);
     }
 
-    await supabase
+    console.log("Database insert successful:", row);
+
+    const { error: profileError } = await supabase
       .from("profiles")
       .update({ upload_count: me.uploadCount + 1 })
       .eq("id", me.id);
+
+    if (profileError) {
+      console.error("Profile update error:", profileError);
+      // Don't throw - upload succeeded, just log the error
+    }
 
     patchState({ currentUser: { ...me, uploadCount: me.uploadCount + 1 } });
 
     const mat = rowToMaterial(row);
     patchState({ materials: [mat, ..._state.materials] });
+    console.log("Upload complete, material ID:", mat.id);
     return mat;
   },
 
@@ -876,6 +874,39 @@ export const users = {
     // Update local state with confirmed data
     patchState({
       users: _state.users.map((u) => (u.id === id ? { ...u, role: "admin" } : u)),
+    });
+
+    // Force reload to verify change persisted
+    await users.loadAll();
+  },
+
+  removeAdmin: async (id: string) => {
+    const user = _state.users.find((u) => u.id === id);
+    if (!user) throw new Error("User not found");
+
+    console.log("Removing admin from user:", id);
+
+    const { data, error } = await supabase
+      .from("profiles")
+      .update({ role: "student" })
+      .eq("id", id)
+      .select();
+
+    if (error) {
+      console.error("Failed to remove admin:", error);
+      throw new Error(`Failed to update user role: ${error.message}`);
+    }
+
+    console.log("Update result:", data);
+
+    if (!data || data.length === 0) {
+      console.error("No rows updated - check RLS permissions");
+      throw new Error("No rows updated. You may not have permission to modify this user.");
+    }
+
+    // Update local state with confirmed data
+    patchState({
+      users: _state.users.map((u) => (u.id === id ? { ...u, role: "student" } : u)),
     });
 
     // Force reload to verify change persisted
