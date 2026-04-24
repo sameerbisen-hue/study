@@ -139,8 +139,13 @@ export default function AdminPanel() {
                               size="sm"
                               variant="outline"
                               onClick={async () => {
-                                await users.makeAdmin(u.id);
-                                toast({ title: "Admin granted", description: `${u.name} is now an admin` });
+                                try {
+                                  await users.makeAdmin(u.id);
+                                  toast({ title: "Admin granted", description: `${u.name} is now an admin` });
+                                } catch (err) {
+                                  const message = err instanceof Error ? err.message : "Failed to make user admin";
+                                  toast({ title: "Error", description: message, variant: "destructive" });
+                                }
                               }}
                             >
                               <Shield className="h-4 w-4 mr-1" /> Make Admin

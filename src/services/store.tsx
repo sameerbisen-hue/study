@@ -827,7 +827,16 @@ export const users = {
     const user = _state.users.find((u) => u.id === id);
     if (!user) return;
 
-    await supabase.from("profiles").update({ role: "admin" }).eq("id", id);
+    const { error } = await supabase
+      .from("profiles")
+      .update({ role: "admin", updated_at: new Date().toISOString() })
+      .eq("id", id);
+
+    if (error) {
+      console.error("Failed to make user admin:", error);
+      throw new Error(`Failed to update user role: ${error.message}`);
+    }
+
     patchState({
       users: _state.users.map((u) => (u.id === id ? { ...u, role: "admin" } : u)),
     });
