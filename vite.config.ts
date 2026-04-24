@@ -10,6 +10,21 @@ export default defineConfig(({ mode }) => ({
     port: 8080,
     hmr: {
       overlay: false,
+      // Disable HMR during file operations to prevent unwanted reloads
+    },
+    watch: {
+      // Use polling instead of native file watching to prevent false triggers
+      usePolling: false,
+      // Ignore common directories that might change during uploads
+      ignored: [
+        '**/node_modules/**',
+        '**/.git/**',
+        '**/dist/**',
+        '**/.vercel/**',
+        '**/public/**',
+        '**/.env*',
+        '**/*.log',
+      ],
     },
   },
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),

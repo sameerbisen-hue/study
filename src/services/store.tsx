@@ -616,16 +616,28 @@ export const materials = {
       : [...mat.upvotedBy, uid];
     const newUpvotes = has ? mat.upvotes - 1 : mat.upvotes + 1;
 
+    // Optimistic update
     patchState({
       materials: _state.materials.map((m) =>
         m.id === id ? { ...m, upvotedBy: newUpvotedBy, upvotes: newUpvotes } : m
       ),
     });
 
-    await supabase
+    // Update database
+    const { error } = await supabase
       .from("materials")
       .update({ upvoted_by: newUpvotedBy, upvotes: newUpvotes })
       .eq("id", id);
+
+    if (error) {
+      console.error("Failed to toggle upvote:", error);
+      // Revert optimistic update on error
+      patchState({
+        materials: _state.materials.map((m) =>
+          m.id === id ? mat : m
+        ),
+      });
+    }
   },
 
   removeIfAllowed: async (id: string): Promise<boolean> => {

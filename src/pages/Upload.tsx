@@ -409,12 +409,12 @@ export default function Upload() {
 
   const renderFileStep = () => (
     <div className="space-y-6">
-      <label
-        htmlFor="file-upload"
+      <div
         onDragEnter={handleDrag}
         onDragLeave={handleDrag}
         onDragOver={handleDrag}
         onDrop={handleDrop}
+        onClick={() => fileInputRef.current?.click()}
         className={`flex flex-col items-center justify-center gap-4 p-8 md:p-12 rounded-2xl border-2 border-dashed transition-all cursor-pointer text-center ${
           dragActive
             ? "border-primary bg-primary/5 scale-[1.02]"
@@ -448,12 +448,31 @@ export default function Upload() {
           type="file"
           className="sr-only"
           onChange={(e) => {
-            onFile(e.target.files?.[0] || undefined);
-            e.target.value = ''; // Reset for same file selection
+            if (e.target.files && e.target.files[0]) {
+              onFile(e.target.files[0]);
+            }
+            // Reset for same file selection - only if file was selected
+            if (e.target.files && e.target.files.length > 0) {
+              e.target.value = '';
+            }
           }}
-          accept=".pdf,.doc,.docx,.ppt,.pptx,.png,.jpg,.jpeg,.webp,.heic,.heif,.md,.txt,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,image/*,image/heic,image/heif,text/plain,text/markdown"
+          accept=".pdf,.doc,.docx,.ppt,.pptx,.png,.jpg,.jpeg,.webp,.heic,.heif,.md,.txt"
+          // Add capture attribute for mobile devices to improve file picker
+          {...(isMobile && { capture: false })}
         />
-      </label>
+      </div>
+      
+      {/* Mobile-specific file picker button */}
+      {isMobile && (
+        <Button
+          onClick={() => fileInputRef.current?.click()}
+          className="w-full"
+          size="lg"
+        >
+          <FileUp className="h-5 w-5 mr-2" />
+          Choose File
+        </Button>
+      )}
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
