@@ -127,9 +127,11 @@ export default function Upload() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // File validation
+  // File validation with mobile-friendly detection
   const onFile = (f?: File) => {
     if (!f) return;
+
+    console.log("File selected:", f.name, "Type:", f.type, "Size:", f.size);
 
     // Mobile file size limit (25MB)
     const mobileSizeLimit = 25 * 1024 * 1024;
@@ -146,21 +148,44 @@ export default function Upload() {
       return;
     }
 
-    // File type validation
-    const allowedTypes = ['pdf', 'docx', 'doc', 'ppt', 'pptx', 'png', 'jpg', 'jpeg', 'webp', 'md', 'txt'];
-    const fileExtension = f.name.split('.').pop()?.toLowerCase();
+    // File type validation (extension first, then MIME type for mobile)
+    const fileExtension = f.name.split('.').pop()?.toLowerCase() || '';
 
-    if (!fileExtension || !allowedTypes.includes(fileExtension)) {
+    // MIME type to extension mapping for mobile where extension might be missing
+    const mimeToExt: Record<string, string> = {
+      'application/pdf': 'pdf',
+      'application/msword': 'doc',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
+      'application/vnd.ms-powerpoint': 'ppt',
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'pptx',
+      'image/png': 'png',
+      'image/jpeg': 'jpg',
+      'image/jpg': 'jpg',
+      'image/webp': 'webp',
+      'text/markdown': 'md',
+      'text/plain': 'txt',
+      'application/octet-stream': fileExtension, // Fallback to extension for generic type
+    };
+
+    // Detect file type from extension or MIME type
+    let detectedExt = fileExtension;
+    if (!fileExtension || fileExtension === 'bin' || fileExtension === 'octet-stream') {
+      detectedExt = mimeToExt[f.type] || fileExtension;
+    }
+
+    const allowedTypes = ['pdf', 'docx', 'doc', 'ppt', 'pptx', 'png', 'jpg', 'jpeg', 'webp', 'md', 'txt'];
+
+    if (!detectedExt || !allowedTypes.includes(detectedExt)) {
       toast({
         title: "File type not supported",
-        description: "Please upload PDF, DOCX, PPT, images, or text files",
+        description: `File type "${f.type || detectedExt}" is not supported. Please upload PDF, DOCX, PPT, images, or text files.`,
         variant: "destructive",
       });
       return;
     }
 
     setFile(f);
-    const ext = fileExtension;
+    const ext = detectedExt;
     if (ext === "pdf") setFileType("pdf");
     else if (ext === "docx" || ext === "doc") setFileType("docx");
     else if (ext === "ppt" || ext === "pptx") setFileType("ppt");
@@ -232,9 +257,19 @@ export default function Upload() {
     }
 
     setUploading(true);
-    setProgress(10);
+    setProgress(0);
+
+    // Simulate progress for better UX on mobile
+    const progressInterval = setInterval(() => {
+      setProgress(prev => {
+        if (prev >= 90) return prev;
+        return prev + Math.random() * 10;
+      });
+    }, 500);
 
     try {
+      console.log("Starting upload:", { title, subject, fileName: file?.name, fileSize: file?.size });
+
       const newMat = await materials.upload({
         title: title.trim(),
         subject: subject.trim(),
@@ -247,6 +282,7 @@ export default function Upload() {
         fileSize: file.size.toString(),
       });
 
+      clearInterval(progressInterval);
       setProgress(100);
       toast({
         title: "Upload successful!",
@@ -256,6 +292,7 @@ export default function Upload() {
       navigate(`/material/${newMat.id}`);
 
     } catch (err) {
+      clearInterval(progressInterval);
       console.error("Upload failed:", err);
 
       const errorMessage = err instanceof Error ? err.message : "Upload failed";

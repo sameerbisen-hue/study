@@ -508,11 +508,23 @@ export const materials = {
     const safeFileName = data.fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
     const storagePath = `${me.id}/${Date.now()}-${safeFileName}`;
 
+    // Detect content type for mobile uploads where file.type might be empty
+    const mimeTypes: Record<FileType, string> = {
+      pdf: 'application/pdf',
+      docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      ppt: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      image: 'image/jpeg',
+      notes: 'text/plain',
+    };
+
+    const contentType = data.file.type || mimeTypes[data.fileType] || 'application/octet-stream';
+    console.log("Uploading with content type:", contentType, "File type:", data.fileType);
+
     const { error: storageError } = await supabase.storage
       .from("materials")
       .upload(storagePath, data.file, {
         upsert: false,
-        contentType: data.file.type || undefined,
+        contentType: contentType,
       });
 
     if (storageError) {
