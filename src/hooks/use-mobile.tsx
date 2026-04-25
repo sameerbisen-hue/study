@@ -7,12 +7,23 @@ export function useIsMobile() {
 
   React.useEffect(() => {
     const mql = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT - 1}px)`);
+    
+    // Debounce the resize handler to prevent excessive re-renders on mobile
+    let timeoutId: NodeJS.Timeout;
     const onChange = () => {
-      setIsMobile(window.innerWidth < MOBILE_BREAKPOINT);
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        setIsMobile(window.innerWidth < MOBILE_BREAKPOINT);
+      }, 100);
     };
+    
     mql.addEventListener("change", onChange);
     setIsMobile(window.innerWidth < MOBILE_BREAKPOINT);
-    return () => mql.removeEventListener("change", onChange);
+    
+    return () => {
+      clearTimeout(timeoutId);
+      mql.removeEventListener("change", onChange);
+    };
   }, []);
 
   return !!isMobile;

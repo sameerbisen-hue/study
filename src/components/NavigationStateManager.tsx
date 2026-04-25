@@ -13,6 +13,7 @@ export function NavigationStateManager({ children }: NavigationStateManagerProps
 
   useEffect(() => {
     let readyTimeoutId: NodeJS.Timeout;
+    let visibilityTimeoutId: NodeJS.Timeout;
 
     const safeSetReady = (value: boolean) => {
       if (mountedRef.current) {
@@ -24,15 +25,17 @@ export function NavigationStateManager({ children }: NavigationStateManagerProps
       const isVisible = !document.hidden;
 
       // When page becomes visible after being hidden, ensure we're ready
-      // Debounce to prevent rapid state changes during visibility toggles
+      // Debounce to prevent rapid state changes during visibility toggles (especially on mobile)
       if (isVisible && !lastVisibilityRef.current) {
         console.log("Page became visible");
-        // Small delay to prevent rapid state changes
-        setTimeout(() => {
+        // Clear any pending timeout
+        clearTimeout(visibilityTimeoutId);
+        // Set a longer delay for mobile to prevent rapid state changes
+        visibilityTimeoutId = setTimeout(() => {
           if (mountedRef.current) {
             safeSetReady(true);
           }
-        }, 100);
+        }, 300);
       }
 
       lastVisibilityRef.current = isVisible;
@@ -89,6 +92,7 @@ export function NavigationStateManager({ children }: NavigationStateManagerProps
       mountedRef.current = false;
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       if (readyTimeoutId) clearTimeout(readyTimeoutId);
+      if (visibilityTimeoutId) clearTimeout(visibilityTimeoutId);
     };
   }, []);
 
