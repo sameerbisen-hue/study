@@ -10,13 +10,21 @@ export default function Profile() {
   const me = useStore(select.currentUser);
   const materialsList = useStore(select.materials);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   
   useEffect(() => {
     async function loadData() {
-      await materials.loadAll();
-      await users.loadAll();
-      await auth.refreshProfile();
-      setLoading(false);
+      try {
+        setError(null);
+        await materials.loadAll();
+        await users.loadAll();
+        await auth.refreshProfile();
+        setLoading(false);
+      } catch (err) {
+        console.error("Failed to load profile data:", err);
+        setError("Failed to load profile data. Please try again.");
+        setLoading(false);
+      }
     }
     loadData();
     
@@ -41,10 +49,36 @@ export default function Profile() {
     };
   }, []);
   
-  if (!me || loading) {
+  if (loading) {
     return (
       <div className="min-h-[40vh] flex items-center justify-center">
         <div className="h-8 w-8 rounded-full border-4 border-primary border-t-transparent animate-spin" />
+      </div>
+    );
+  }
+  
+  if (error) {
+    return (
+      <div className="min-h-[40vh] flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <p className="text-destructive">{error}</p>
+          <button onClick={() => window.location.reload()} className="text-primary hover:underline">
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+  
+  if (!me) {
+    return (
+      <div className="min-h-[40vh] flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <p className="text-muted-foreground">Please sign in to view your profile.</p>
+          <button onClick={() => window.location.href = '/login'} className="text-primary hover:underline">
+            Sign in
+          </button>
+        </div>
       </div>
     );
   }

@@ -882,10 +882,14 @@ export const reviews = {
       });
     }
 
-    await supabase
+    const { error: profileError } = await supabase
       .from("profiles")
       .update({ review_count: me.reviewCount + 1 })
       .eq("id", me.id);
+
+    if (profileError) {
+      console.error("Failed to update review count in profile:", profileError);
+    }
 
     patchState({
       reviews: [newReview, ..._state.reviews],
