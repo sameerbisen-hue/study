@@ -83,7 +83,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       try {
         const { data: { session } } = await withTimeout(
           supabase.auth.getSession(),
-          7000,
+          3000,
           "Timed out while checking your session"
         );
         if (!isMounted) return;
@@ -95,7 +95,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
         const { data: { user }, error } = await withTimeout(
           supabase.auth.getUser(),
-          7000,
+          3000,
           "Timed out while validating your user"
         );
         if (!isMounted) return;
@@ -110,7 +110,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           return;
         }
 
-        // Ensure profile exists
+        // Ensure profile exists with shorter timeout
         const profile = await withTimeout(
           ensureProfile({
           userId: user.id,
@@ -120,7 +120,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
               ? user.user_metadata.name
               : null,
           }),
-          10000,
+          5000,
           "Timed out while loading your profile"
         );
 
@@ -281,7 +281,7 @@ async function fetchProfile(userId: string): Promise<User | null> {
   return data ? rowToUser(data) : null;
 }
 
-async function waitForProfile(userId: string, attempts = 3): Promise<User | null> {
+async function waitForProfile(userId: string, attempts = 2): Promise<User | null> {
   for (let i = 0; i < attempts; i += 1) {
     try {
       const profile = await fetchProfile(userId);
@@ -290,7 +290,7 @@ async function waitForProfile(userId: string, attempts = 3): Promise<User | null
       console.error("Profile fetch error:", error);
     }
     if (i < attempts - 1) {
-      await new Promise((resolve) => setTimeout(resolve, 300 * (i + 1)));
+      await new Promise((resolve) => setTimeout(resolve, 100));
     }
   }
   return null;
@@ -301,7 +301,7 @@ async function ensureProfile(params: {
   email?: string | null;
   name?: string | null;
 }): Promise<User | null> {
-  const existing = await waitForProfile(params.userId, 2);
+  const existing = await waitForProfile(params.userId, 1);
   if (existing) return existing;
 
   const fallbackName = params.name?.trim() || params.email?.split("@")[0] || "User";
@@ -327,14 +327,14 @@ async function ensureProfile(params: {
     if (upsertError) {
       console.error("Profile upsert error:", upsertError);
       // Try to fetch the profile one more time in case it was created by a trigger
-      return waitForProfile(params.userId, 2);
+      return waitForProfile(params.userId, 1);
     }
 
     // Wait for the profile to be available
-    return waitForProfile(params.userId, 3);
+    return waitForProfile(params.userId, 2);
   } catch (error) {
     console.error("Profile creation error:", error);
-    return waitForProfile(params.userId, 2);
+    return waitForProfile(params.userId, 1);
   }
 }
 
