@@ -1,8 +1,9 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { ShieldCheck, Users, FileText, Flag, Trash2, Ban, CheckCircle, Shield, ShieldOff } from "lucide-react";
+import { ShieldCheck, Users, FileText, Flag, Trash2, Ban, CheckCircle, Shield, ShieldOff, Search } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -11,6 +12,8 @@ import { toast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 
 export default function AdminPanel() {
+  const [searchQuery, setSearchQuery] = useState("");
+  
   useEffect(() => {
     materials.loadAll();
     users.loadAll();
@@ -20,6 +23,15 @@ export default function AdminPanel() {
   const mats = useStore(select.materials);
   const us = useStore(select.users);
   const reps = useStore(select.reports);
+
+  const filteredMaterials = mats.filter((m) => {
+    const query = searchQuery.toLowerCase();
+    return (
+      m.title.toLowerCase().includes(query) ||
+      m.subject.toLowerCase().includes(query) ||
+      m.uploaderName.toLowerCase().includes(query)
+    );
+  });
 
   const stats = [
     { label: "Users", value: us.length, icon: Users },
@@ -59,7 +71,20 @@ export default function AdminPanel() {
 
         <TabsContent value="uploads">
           <Card className="border-border/60">
-            <CardHeader><CardTitle className="text-base">All uploads</CardTitle></CardHeader>
+            <CardHeader>
+              <div className="flex items-center justify-between gap-4">
+                <CardTitle className="text-base">All uploads</CardTitle>
+                <div className="relative w-64">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search by title, subject, or uploader..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-9"
+                  />
+                </div>
+              </div>
+            </CardHeader>
             <CardContent className="overflow-x-auto">
               <Table>
                 <TableHeader>
@@ -72,7 +97,7 @@ export default function AdminPanel() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {mats.slice(0, 15).map((m) => (
+                  {filteredMaterials.slice(0, 15).map((m) => (
                     <TableRow key={m.id}>
                       <TableCell className="font-medium max-w-xs truncate">
                         <Link to={`/material/${m.id}`} className="hover:text-primary">{m.title}</Link>
@@ -95,6 +120,13 @@ export default function AdminPanel() {
                       </TableCell>
                     </TableRow>
                   ))}
+                  {filteredMaterials.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                        {searchQuery ? "No uploads match your search." : "No uploads yet."}
+                      </TableCell>
+                    </TableRow>
+                  )}
                 </TableBody>
               </Table>
             </CardContent>
