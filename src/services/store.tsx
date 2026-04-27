@@ -357,13 +357,22 @@ async function resolveCurrentUserProfile(): Promise<User | null> {
 }
 
 function triggerBrowserDownload(url: string, fileName: string) {
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = fileName;
-  anchor.rel = "noopener noreferrer";
-  document.body.appendChild(anchor);
-  anchor.click();
-  anchor.remove();
+  // Check if mobile device
+  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  
+  if (isMobile) {
+    // On mobile, open in new tab instead of trying to download
+    window.open(url, '_blank');
+  } else {
+    // On desktop, use anchor download
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = fileName;
+    anchor.rel = "noopener noreferrer";
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+  }
 }
 
 export const auth = {

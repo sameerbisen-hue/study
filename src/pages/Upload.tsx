@@ -237,7 +237,8 @@ export default function Upload() {
       return;
     }
 
-    if (authStatus !== 'authenticated') {
+    // Skip auth check on mobile to avoid issues - let the upload function handle it
+    if (!isMobile && authStatus !== 'authenticated') {
       toast({
         title: "Not authenticated",
         description: "Please sign in to upload files",
@@ -259,7 +260,7 @@ export default function Upload() {
     }, 500);
 
     try {
-      console.log("Starting upload:", { title, subject, fileName: file?.name, fileSize: file?.size });
+      console.log("Starting upload:", { title, subject, fileName: file?.name, fileSize: file?.size, fileType });
 
       const newMat = await materials.upload({
         title: title.trim(),
@@ -294,22 +295,18 @@ export default function Upload() {
         userFriendlyMessage = "Permission denied. Please sign in again.";
         setSessionExpired(true);
       } else if (errorMessage.includes("network") || errorMessage.includes("connection")) {
-        userFriendlyMessage = "Network error. Please check your connection.";
+        userFriendlyMessage = "Network error. Please check your connection and try again.";
       } else if (errorMessage.includes("timeout")) {
-        userFriendlyMessage = "Upload timeout. Try with a smaller file.";
-      } else if (errorMessage.includes("large") || errorMessage.includes("size")) {
-        userFriendlyMessage = "File too large. Please use a smaller file.";
-      } else if (errorMessage.includes("bucket") || errorMessage.includes("storage")) {
-        userFriendlyMessage = "Storage error. The upload bucket may not be configured.";
+        userFriendlyMessage = "Upload timed out. Please try again with a smaller file or better connection.";
       }
 
+      setUploading(false);
+      setProgress(0);
       toast({
         title: "Upload failed",
         description: userFriendlyMessage,
-        variant: "destructive",
+        variant: "destructive"
       });
-      setUploading(false);
-      setProgress(0);
     }
   };
 
@@ -436,6 +433,7 @@ export default function Upload() {
           type="file"
           className="sr-only"
           onChange={(e) => {
+            console.log("File input changed:", e.target.files?.length, "files");
             if (e.target.files && e.target.files[0]) {
               onFile(e.target.files[0]);
             }
@@ -445,8 +443,6 @@ export default function Upload() {
             }
           }}
           accept=".pdf,.doc,.docx,.ppt,.pptx,.png,.jpg,.jpeg,.webp,.heic,.heif,.md,.txt"
-          // Add capture attribute for mobile devices to improve file picker
-          {...(isMobile && { capture: false })}
         />
       </div>
       
