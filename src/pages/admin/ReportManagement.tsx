@@ -42,6 +42,7 @@ export default function ReportManagement() {
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
+          name="search"
           placeholder="Search by material title, reporter, reason, or status..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}

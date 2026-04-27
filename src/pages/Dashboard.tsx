@@ -4,20 +4,43 @@ import { ArrowRight, BookOpen, Flame, ThumbsUp, Trophy, Upload } from "lucide-re
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { MaterialCard } from "@/components/materials/MaterialCard";
-import { materials, useStore, select, users } from "@/services/store";
+import { materials, useStore, select, users, auth } from "@/services/store";
 
 export default function Dashboard() {
+  const materialsList = useStore(select.materials);
+  const usersList = useStore(select.users);
+  const me = useStore(select.currentUser);
+
   useEffect(() => {
     materials.loadAll();
     users.loadAll();
+    auth.refreshProfile();
+    
+    // Refresh data when the page gains focus
+    const handleFocus = () => {
+      materials.loadAll();
+      users.loadAll();
+      auth.refreshProfile();
+    };
+    
+    // Also refresh periodically every 30 seconds
+    const interval = setInterval(() => {
+      materials.loadAll();
+      users.loadAll();
+      auth.refreshProfile();
+    }, 30000);
+    
+    window.addEventListener('focus', handleFocus);
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      clearInterval(interval);
+    };
   }, []);
 
-  useStore(select.materials);
-  const me = useStore(select.currentUser);
   const recent = materials.recent();
   const trending = materials.trending();
   const topUpvoted = materials.topUpvoted();
-  const leaders = [...users.list()]
+  const leaders = [...usersList]
     .filter((u) => u.role === "student")
     .sort((a, b) => b.totalUpvotes - a.totalUpvotes)
     .slice(0, 5);

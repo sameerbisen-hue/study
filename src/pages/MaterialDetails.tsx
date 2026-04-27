@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatDistanceToNow } from "date-fns";
+import { formatBytes } from "@/lib/utils";
 import { bookmarks, materials, reports, reviews, useStore, select } from "@/services/store";
 import { fileTypeLabel, reportReasonLabel } from "@/services/labels";
 import type { ReportReason } from "@/services/types";
@@ -125,7 +126,7 @@ export default function MaterialDetails() {
                 <div className="text-sm">
                   <div className="font-medium">{material.uploaderName || "User"}</div>
                   <div className="text-xs text-muted-foreground">
-                    Uploaded {formatDistanceToNow(new Date(material.uploadedAt), { addSuffix: true })} · {material.fileSize}
+                    Uploaded {formatDistanceToNow(new Date(material.uploadedAt), { addSuffix: true })} · {formatBytes(material.fileSize)}
                   </div>
                 </div>
               </div>
@@ -233,7 +234,7 @@ export default function MaterialDetails() {
               <Stat label="Downloads" value={material.downloads} />
               <Stat label="Average rating" value={`${material.ratingAvg || "—"} ★`} />
               <Stat label="Reviews" value={material.ratingCount} />
-              <Stat label="File size" value={material.fileSize} />
+              <Stat label="File size" value={formatBytes(material.fileSize)} />
             </CardContent>
           </Card>
         </div>

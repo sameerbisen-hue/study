@@ -19,6 +19,7 @@ export default function Signup() {
     try {
       setLoading(true);
       const res = await auth.signup(name, email, password);
+      
       if (!res.ok) {
         toast({ title: "Signup failed", description: res.error, variant: "destructive" });
         return;

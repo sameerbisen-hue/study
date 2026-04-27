@@ -14,7 +14,17 @@ export default function Library() {
   const [semester, setSemester] = useState("all");
   const [sort, setSort] = useState<"newest" | "popular" | "rating">("newest");
 
-  useEffect(() => { materials.loadAll(); }, []);
+  useEffect(() => { 
+    materials.loadAll();
+    
+    // Refresh data when the page gains focus
+    const handleFocus = () => {
+      materials.loadAll();
+    };
+    
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, []);
   useEffect(() => setQ(params.get("q") ?? ""), [params]);
 
   const subjects = useMemo(() => Array.from(new Set(all.map((m) => m.subject))).sort(), [all]);
@@ -50,6 +60,7 @@ export default function Library() {
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
+            name="search"
             value={q}
             onChange={(e) => { setQ(e.target.value); setParams({ q: e.target.value }); }}
             placeholder="Search by title, subject, tag..."

@@ -3,12 +3,35 @@ import { Trophy, Upload, ThumbsUp, MessageSquare } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { useStore, select, users } from "@/services/store";
+import { useStore, select, users, auth } from "@/services/store";
 import type { User } from "@/services/types";
 
 export default function Leaderboard() {
-  useEffect(() => { users.loadAll(); }, []);
-  const all = useStore(select.users).filter((u) => u.role === "student");
+  const usersList = useStore(select.users);
+
+  useEffect(() => { 
+    users.loadAll();
+    auth.refreshProfile();
+    
+    // Refresh data when the page gains focus
+    const handleFocus = () => {
+      users.loadAll();
+      auth.refreshProfile();
+    };
+    
+    // Also refresh periodically every 30 seconds
+    const interval = setInterval(() => {
+      users.loadAll();
+      auth.refreshProfile();
+    }, 30000);
+    
+    window.addEventListener('focus', handleFocus);
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      clearInterval(interval);
+    };
+  }, []);
+  const all = usersList.filter((u) => u.role === "student");
 
   const byUploads = [...all].sort((a, b) => b.uploadCount - a.uploadCount);
   const byUpvotes = [...all].sort((a, b) => b.totalUpvotes - a.totalUpvotes);

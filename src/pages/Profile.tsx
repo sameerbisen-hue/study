@@ -3,24 +3,43 @@ import { Mail, Calendar, BookOpen, ThumbsUp, MessageSquare } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { MaterialCard } from "@/components/materials/MaterialCard";
-import { useStore, select, materials, users } from "@/services/store";
+import { useStore, select, materials, users, auth } from "@/services/store";
 import { format } from "date-fns";
 
 export default function Profile() {
   const me = useStore(select.currentUser);
+  const materialsList = useStore(select.materials);
   const [loading, setLoading] = useState(true);
   
   useEffect(() => {
     async function loadData() {
       await materials.loadAll();
-      // Refresh users list to get updated profile data
       await users.loadAll();
+      await auth.refreshProfile();
       setLoading(false);
     }
     loadData();
+    
+    // Refresh data when the page gains focus
+    const handleFocus = () => {
+      materials.loadAll();
+      users.loadAll();
+      auth.refreshProfile();
+    };
+    
+    // Also refresh periodically every 30 seconds
+    const interval = setInterval(() => {
+      materials.loadAll();
+      users.loadAll();
+      auth.refreshProfile();
+    }, 30000);
+    
+    window.addEventListener('focus', handleFocus);
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      clearInterval(interval);
+    };
   }, []);
-  
-  useStore(select.materials);
   
   if (!me || loading) {
     return (

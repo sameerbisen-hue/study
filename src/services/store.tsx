@@ -78,14 +78,14 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let isMounted = true;
+    let isSyncing = false;
 
     const syncAuthState = async () => {
+      if (isSyncing) return;
+      isSyncing = true;
+
       try {
-        const { data: { session } } = await withTimeout(
-          supabase.auth.getSession(),
-          2000,
-          "Timed out while checking your session"
-        );
+        const { data: { session } } = await supabase.auth.getSession();
         if (!isMounted) return;
 
         if (!session?.user) {
@@ -93,15 +93,10 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           return;
         }
 
-        const { data: { user }, error } = await withTimeout(
-          supabase.auth.getUser(),
-          2000,
-          "Timed out while validating your user"
-        );
+        const { data: { user }, error } = await supabase.auth.getUser();
         if (!isMounted) return;
 
         if (error || !user) {
-          // Only sign out if it's a real auth error, not a timeout or network issue
           if (error && !error.message.includes('timed out') && !error.message.includes('network')) {
             await supabase.auth.signOut();
           }
@@ -110,19 +105,15 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           return;
         }
 
-        // Ensure profile exists with shorter timeout
-        const profile = await withTimeout(
-          ensureProfile({
+        // Ensure profile exists
+        const profile = await ensureProfile({
           userId: user.id,
           email: user.email,
           name:
             typeof user.user_metadata?.name === "string"
               ? user.user_metadata.name
               : null,
-          }),
-          3000,
-          "Timed out while loading your profile"
-        );
+        });
 
         if (!isMounted) return;
 
@@ -142,6 +133,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         console.error("Auth state sync error:", error);
         if (!isMounted) return;
         clearAuthState();
+      } finally {
+        isSyncing = false;
       }
     };
 
@@ -169,21 +162,13 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         if (profile) {
           patchState({ currentUser: profile, loading: false });
           await bookmarks.loadForUser(profile.id);
-          // Refresh users list to get updated profile data
           await users.loadAll();
         }
         return;
       }
 
-      // Prevent multiple concurrent syncs
-      if (_state.loading) return;
-
-      try {
+      if (!isSyncing) {
         await syncAuthState();
-      } catch (error) {
-        console.error("Auth state change error:", error);
-        if (!isMounted) return;
-        clearAuthState();
       }
     });
 
@@ -386,6 +371,30 @@ export const auth = {
   isAdmin: () => _state.currentUser?.role === "admin",
   isAuthenticated: () => Boolean(_state.currentUser),
 
+  refreshProfile: async () => {
+    const me = _state.currentUser;
+    if (!me) return;
+
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", me.id)
+      .single();
+
+    if (error) {
+      console.error("Failed to refresh profile:", error);
+      return;
+    }
+
+    if (data) {
+      const updatedProfile = rowToUser(data);
+      patchState({
+        currentUser: updatedProfile,
+        users: _state.users.map(u => u.id === me.id ? updatedProfile : u),
+      });
+    }
+  },
+
   signup: async (
     name: string,
     email: string,
@@ -397,30 +406,23 @@ export const auth = {
     message?: string;
   }> => {
     try {
-      const { data, error } = await withTimeout(
-        supabase.auth.signUp({
-          email,
-          password,
-          options: { data: { name } },
-        }),
-        10000,
-        "Sign up request timed out. Please check your connection and try again."
-      );
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: { data: { name } },
+      });
+      
       if (error) return { ok: false, error: error.message };
 
       if (!data.user) {
         return { ok: true, nextStep: "login" };
       }
 
-      const profile = await withTimeout(
-        ensureProfile({
-          userId: data.user.id,
-          name,
-          email: data.user.email ?? email,
-        }),
-        8000,
-        "Profile setup timed out. Please try signing in again."
-      );
+      const profile = await ensureProfile({
+        userId: data.user.id,
+        name,
+        email: data.user.email ?? email,
+      });
 
       if (profile && data.session) {
         patchState({ currentUser: profile, loading: false });
@@ -460,29 +462,22 @@ export const auth = {
     password: string
   ): Promise<{ ok: boolean; error?: string }> => {
     try {
-      const { data, error } = await withTimeout(
-        supabase.auth.signInWithPassword({
-          email,
-          password,
-        }),
-        10000,
-        "Sign in request timed out. Please check your connection and try again."
-      );
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      
       if (error) return { ok: false, error: error.message };
 
       if (data.user) {
-        const profile = await withTimeout(
-          ensureProfile({
-            userId: data.user.id,
-            email: data.user.email ?? email,
-            name:
-              typeof data.user.user_metadata?.name === "string"
-                ? data.user.user_metadata.name
-                : null,
-          }),
-          8000,
-          "Profile loading timed out. Please try signing in again."
-        );
+        const profile = await ensureProfile({
+          userId: data.user.id,
+          email: data.user.email ?? email,
+          name:
+            typeof data.user.user_metadata?.name === "string"
+              ? data.user.user_metadata.name
+              : null,
+        });
 
         if (!profile) {
           return {
@@ -572,6 +567,9 @@ export const materials = {
   }): Promise<Material> => {
     console.log("Upload started:", { fileName: data.fileName, fileSize: data.fileSize, fileType: data.fileType });
 
+    // Refresh profile to get latest name
+    await auth.refreshProfile();
+    
     const me = await resolveCurrentUserProfile();
     if (!me) {
       console.error("Upload failed: No current user profile");
@@ -624,7 +622,7 @@ export const materials = {
         file_size: data.fileSize,
         file_path: storagePath,
         uploader_id: me.id,
-        uploader_name: me.name,
+        uploader_name: me.name && me.name !== "User" ? me.name : me.email?.split("@")[0] || "User",
         uploader_avatar: me.avatarUrl || null,
       })
       .select()
@@ -650,8 +648,9 @@ export const materials = {
 
     patchState({ currentUser: { ...me, uploadCount: me.uploadCount + 1 } });
     
-    // Refresh users list to update leaderboard data
+    // Refresh users list and current user profile to update leaderboard data
     await users.loadAll();
+    await auth.refreshProfile();
 
     const mat = rowToMaterial(row);
     patchState({ materials: [mat, ..._state.materials] });
@@ -716,7 +715,15 @@ export const materials = {
             ? { ..._state.currentUser, totalUpvotes: newTotalUpvotes }
             : _state.currentUser,
         });
+        
+        // Refresh profile if the current user is the uploader
+        if (_state.currentUser?.id === mat.uploaderId) {
+          await auth.refreshProfile();
+        }
       }
+      
+      // Refresh users list to update leaderboard
+      await users.loadAll();
     }
   },
 
@@ -885,8 +892,9 @@ export const reviews = {
       currentUser: { ...me, reviewCount: me.reviewCount + 1 },
     });
     
-    // Refresh users list to update leaderboard data
+    // Refresh users list and current user profile to update leaderboard data
     await users.loadAll();
+    await auth.refreshProfile();
   },
 };
 
