@@ -9,6 +9,7 @@ import type { User } from "@/services/types";
 export default function Leaderboard() {
   useEffect(() => { users.loadAll(); }, []);
   const all = useStore(select.users).filter((u) => u.role === "student");
+
   const byUploads = [...all].sort((a, b) => b.uploadCount - a.uploadCount);
   const byUpvotes = [...all].sort((a, b) => b.totalUpvotes - a.totalUpvotes);
   const byReviews = [...all].sort((a, b) => b.reviewCount - a.reviewCount);

@@ -144,7 +144,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
     void syncAuthState();
 
-    const { data: listener } = supabase.auth.onAuthStateChange(async (event) => {
+    const { data: listener } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!isMounted) return;
 
       if (event === "TOKEN_REFRESHED") {
@@ -153,6 +153,21 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
       if (event === "SIGNED_OUT") {
         clearAuthState();
+        return;
+      }
+
+      if (event === "SIGNED_IN" && session?.user) {
+        const profile = await ensureProfile({
+          userId: session.user.id,
+          email: session.user.email,
+          name: typeof session.user.user_metadata?.name === "string" ? session.user.user_metadata.name : null,
+        });
+        if (profile) {
+          patchState({ currentUser: profile, loading: false });
+          await bookmarks.loadForUser(profile.id);
+          // Refresh users list to get updated profile data
+          await users.loadAll();
+        }
         return;
       }
 
@@ -318,6 +333,25 @@ async function ensureProfile(params: {
     return waitForProfile(params.userId, 2);
   }
 }
+
+// Function to update user profile in database
+export const updateProfile = async (userId: string, updates: { name?: string; bio?: string; semester?: string }): Promise<void> => {
+  const { error } = await supabase
+    .from("profiles")
+    .update(updates)
+    .eq("id", userId);
+
+  if (error) {
+    console.error("Failed to update profile:", error);
+    throw error;
+  }
+
+  // Refresh the user data in state
+  const updatedUser = await fetchProfile(userId);
+  if (updatedUser) {
+    patchState({ currentUser: updatedUser });
+  }
+};
 
 async function resolveCurrentUserProfile(): Promise<User | null> {
   if (_state.currentUser) return _state.currentUser;

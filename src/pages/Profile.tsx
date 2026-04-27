@@ -1,17 +1,28 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Mail, Calendar, BookOpen, ThumbsUp, MessageSquare } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { MaterialCard } from "@/components/materials/MaterialCard";
-import { useStore, select, materials } from "@/services/store";
+import { useStore, select, materials, users } from "@/services/store";
 import { format } from "date-fns";
 
 export default function Profile() {
-  useEffect(() => { materials.loadAll(); }, []);
   const me = useStore(select.currentUser);
+  const [loading, setLoading] = useState(true);
+  
+  useEffect(() => {
+    async function loadData() {
+      await materials.loadAll();
+      // Refresh users list to get updated profile data
+      await users.loadAll();
+      setLoading(false);
+    }
+    loadData();
+  }, []);
+  
   useStore(select.materials);
   
-  if (!me) {
+  if (!me || loading) {
     return (
       <div className="min-h-[40vh] flex items-center justify-center">
         <div className="h-8 w-8 rounded-full border-4 border-primary border-t-transparent animate-spin" />
