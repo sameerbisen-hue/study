@@ -415,11 +415,15 @@ export const auth = {
     message?: string;
   }> => {
     try {
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: { data: { name } },
-      });
+      const { data, error } = await withTimeout(
+        supabase.auth.signUp({
+          email,
+          password,
+          options: { data: { name } },
+        }),
+        10000,
+        "Signup timed out. Please check your connection and try again."
+      );
       
       if (error) return { ok: false, error: error.message };
 
@@ -427,11 +431,15 @@ export const auth = {
         return { ok: true, nextStep: "login" };
       }
 
-      const profile = await ensureProfile({
-        userId: data.user.id,
-        name,
-        email: data.user.email ?? email,
-      });
+      const profile = await withTimeout(
+        ensureProfile({
+          userId: data.user.id,
+          name,
+          email: data.user.email ?? email,
+        }),
+        5000,
+        "Profile creation timed out. Please try again."
+      );
 
       if (profile && data.session) {
         patchState({ currentUser: profile, loading: false });
@@ -447,15 +455,13 @@ export const auth = {
         return {
           ok: true,
           nextStep: "login",
-          message: "Your account was created. Please sign in to continue.",
+          message: "Account created! Please sign in.",
         };
       }
 
       return {
-        ok: true,
-        nextStep: data.session ? "dashboard" : "login",
-        message:
-          "Your account was created, but your profile is still finishing setup. Please try signing in again in a moment.",
+        ok: false,
+        error: "Account creation failed. Please try again.",
       };
     } catch (error) {
       return {
@@ -471,22 +477,30 @@ export const auth = {
     password: string
   ): Promise<{ ok: boolean; error?: string }> => {
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+      const { data, error } = await withTimeout(
+        supabase.auth.signInWithPassword({
+          email,
+          password,
+        }),
+        10000,
+        "Login timed out. Please check your connection and try again."
+      );
       
       if (error) return { ok: false, error: error.message };
 
       if (data.user) {
-        const profile = await ensureProfile({
-          userId: data.user.id,
-          email: data.user.email ?? email,
-          name:
-            typeof data.user.user_metadata?.name === "string"
-              ? data.user.user_metadata.name
-              : null,
-        });
+        const profile = await withTimeout(
+          ensureProfile({
+            userId: data.user.id,
+            email: data.user.email ?? email,
+            name:
+              typeof data.user.user_metadata?.name === "string"
+                ? data.user.user_metadata.name
+                : null,
+          }),
+          5000,
+          "Profile load timed out. Please try again."
+        );
 
         if (!profile) {
           return {
