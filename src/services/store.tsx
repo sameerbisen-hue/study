@@ -886,12 +886,14 @@ export const reviews = {
     const me = await resolveCurrentUserProfile();
     if (!me) return;
 
+    const displayName = me.name && me.name.trim() && me.name !== "User" ? me.name : me.email?.split("@")[0] || "User";
+    
     const { data, error } = await supabase
       .from("reviews")
       .insert({
         material_id: materialId,
         user_id: me.id,
-        user_name: me.name,
+        user_name: displayName,
         user_avatar: me.avatarUrl || null,
         rating,
         comment,
@@ -905,7 +907,7 @@ export const reviews = {
       id: data.id as string,
       materialId,
       userId: me.id,
-      userName: me.name,
+      userName: displayName,
       rating,
       comment,
       createdAt: data.created_at as string,
