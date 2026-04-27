@@ -61,30 +61,18 @@ export default function Upload() {
       setAuthStatus('checking');
       
       try {
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        const { data: { session }, error } = await supabase.auth.getSession();
         
-        if (sessionError) {
-          console.error("Session error:", sessionError);
+        if (error || !session) {
+          console.log("No session found, user not authenticated");
           setAuthStatus('unauthenticated');
           setSessionExpired(true);
           return;
         }
         
-        if (!session) {
-          console.log("No session found");
-          setAuthStatus('unauthenticated');
-          setSessionExpired(true);
-          return;
-        }
-        
-        // Check if session is expired
-        if (session.expires_at && Date.now() > session.expires_at * 1000) {
-          console.log("Session expired");
-          setAuthStatus('unauthenticated');
-          setSessionExpired(true);
-          await supabase.auth.signOut();
-          return;
-        }
+        // Don't aggressively check session expiration on mobile
+        // Let Supabase handle token refresh automatically
+        // Only sign out if we get an actual auth error from an API call
         
         // Validate user exists
         const { data: { user }, error: userError } = await supabase.auth.getUser();

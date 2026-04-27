@@ -35,7 +35,7 @@ export function NavigationStateManager({ children }: NavigationStateManagerProps
           if (mountedRef.current) {
             safeSetReady(true);
           }
-        }, 300);
+        }, 500);
       }
 
       lastVisibilityRef.current = isVisible;

@@ -101,7 +101,10 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         if (!isMounted) return;
 
         if (error || !user) {
-          await supabase.auth.signOut();
+          // Only sign out if it's a real auth error, not a timeout or network issue
+          if (error && !error.message.includes('timed out') && !error.message.includes('network')) {
+            await supabase.auth.signOut();
+          }
           if (!isMounted) return;
           clearAuthState();
           return;
@@ -148,6 +151,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       if (!isMounted) return;
 
       if (event === "TOKEN_REFRESHED") {
+        // Token was refreshed successfully, no action needed
         return;
       }
 
