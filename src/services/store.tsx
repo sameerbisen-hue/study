@@ -106,14 +106,18 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         }
 
         // Ensure profile exists
-        const profile = await ensureProfile({
-          userId: user.id,
-          email: user.email,
-          name:
-            typeof user.user_metadata?.name === "string"
-              ? user.user_metadata.name
-              : null,
-        });
+        const profile = await withTimeout(
+          ensureProfile({
+            userId: user.id,
+            email: user.email,
+            name:
+              typeof user.user_metadata?.name === "string"
+                ? user.user_metadata.name
+                : null,
+          }),
+          5000,
+          "Profile load timed out during initial auth check"
+        );
 
         if (!isMounted) return;
 
@@ -154,11 +158,15 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (event === "SIGNED_IN" && session?.user) {
-        const profile = await ensureProfile({
-          userId: session.user.id,
-          email: session.user.email,
-          name: typeof session.user.user_metadata?.name === "string" ? session.user.user_metadata.name : null,
-        });
+        const profile = await withTimeout(
+          ensureProfile({
+            userId: session.user.id,
+            email: session.user.email,
+            name: typeof session.user.user_metadata?.name === "string" ? session.user.user_metadata.name : null,
+          }),
+          5000,
+          "Profile load timed out during sign in"
+        );
         if (profile) {
           patchState({ currentUser: profile, loading: false });
           await bookmarks.loadForUser(profile.id);
