@@ -687,7 +687,7 @@ export default function Upload() {
         <div className="space-y-3 p-4 rounded-xl bg-primary/5 border border-primary/20">
           <div className="flex items-center justify-between">
             <span className="font-medium">Uploading...</span>
-            <span className="text-primary font-bold">{progress}%</span>
+            <span className="text-primary font-bold">{Math.round(progress)}%</span>
           </div>
           <Progress value={progress} className="w-full h-2" />
           <p className="text-xs text-muted-foreground">

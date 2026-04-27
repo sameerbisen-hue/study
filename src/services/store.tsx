@@ -567,9 +567,6 @@ export const materials = {
   }): Promise<Material> => {
     console.log("Upload started:", { fileName: data.fileName, fileSize: data.fileSize, fileType: data.fileType });
 
-    // Refresh profile to get latest name
-    await auth.refreshProfile();
-    
     const me = await resolveCurrentUserProfile();
     if (!me) {
       console.error("Upload failed: No current user profile");
@@ -595,12 +592,19 @@ export const materials = {
     const contentType = data.file.type || mimeTypes[data.fileType] || 'application/octet-stream';
     console.log("Uploading with content type:", contentType, "File type:", data.fileType);
 
-    const { error: storageError, data: storageData } = await supabase.storage
+    // Add timeout for storage upload (2 minutes)
+    const uploadPromise = supabase.storage
       .from("materials")
       .upload(storagePath, data.file, {
         upsert: false,
         contentType: contentType,
       });
+
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error("Upload timed out. Please check your connection and try again.")), 120000);
+    });
+
+    const { error: storageError, data: storageData } = await Promise.race([uploadPromise, timeoutPromise]) as any;
 
     if (storageError) {
       console.error("Storage upload error:", storageError);
