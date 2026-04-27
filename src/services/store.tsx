@@ -686,12 +686,14 @@ export const materials = {
 
     if (profileError) {
       console.error("Profile update error:", profileError);
-      // Don't throw - upload succeeded, just log the error
+    } else {
+      console.log("Upload count updated successfully in database for user:", me.id);
     }
 
     patchState({ currentUser: { ...me, uploadCount: me.uploadCount + 1 } });
     
     // Refresh users list and current user profile to update leaderboard data
+    console.log("Refreshing users list after upload");
     await users.loadAll();
     await auth.refreshProfile();
 
@@ -744,29 +746,31 @@ export const materials = {
       const uploader = _state.users.find(u => u.id === mat.uploaderId);
       if (uploader) {
         const newTotalUpvotes = Math.max(0, uploader.totalUpvotes + upvoteDelta);
-        await supabase
+        const { error: profileError } = await supabase
           .from("profiles")
           .update({ total_upvotes: newTotalUpvotes })
           .eq("id", mat.uploaderId);
         
+        if (profileError) {
+          console.error("Failed to update total_upvotes in profile:", profileError);
+        } else {
+          console.log("Total upvotes updated successfully in database for user:", mat.uploaderId);
+        }
+        
         // Update local state for uploader
         patchState({
-          users: _state.users.map(u => 
-            u.id === mat.uploaderId ? { ...u, totalUpvotes: newTotalUpvotes } : u
-          ),
-          currentUser: _state.currentUser?.id === mat.uploaderId 
-            ? { ..._state.currentUser, totalUpvotes: newTotalUpvotes }
-            : _state.currentUser,
+          users: _state.users.map(u => u.id === mat.uploaderId ? { ...u, totalUpvotes: newTotalUpvotes } : u),
         });
-        
-        // Refresh profile if the current user is the uploader
-        if (_state.currentUser?.id === mat.uploaderId) {
-          await auth.refreshProfile();
-        }
       }
-      
-      // Refresh users list to update leaderboard
-      await users.loadAll();
+    }
+    
+    // Refresh users list to update leaderboard
+    console.log("Refreshing users list after upvote");
+    await users.loadAll();
+    
+    // Refresh profile if the current user is the uploader
+    if (_state.currentUser?.id === mat.uploaderId) {
+      await auth.refreshProfile();
     }
   },
 
@@ -1006,6 +1010,7 @@ export const users = {
   list: () => _state.users,
 
   loadAll: async () => {
+    console.log("Loading users from database...");
     const { data, error } = await supabase
       .from("profiles")
       .select("*")
@@ -1017,6 +1022,7 @@ export const users = {
     }
 
     if (data) {
+      console.log("Users loaded successfully:", data.length, "users");
       patchState({ users: data.map(rowToUser) });
     }
   },

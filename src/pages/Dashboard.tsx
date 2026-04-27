@@ -124,18 +124,21 @@ export default function Dashboard() {
             <Button asChild variant="ghost" size="sm"><Link to="/leaderboard">Full <ArrowRight className="h-3 w-3" /></Link></Button>
           </CardHeader>
           <CardContent className="space-y-2">
-            {leaders.map((u, i) => (
-              <div key={u.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-muted transition">
-                <div className="flex items-center gap-3">
-                  <span className="text-xs font-bold text-muted-foreground w-5">#{i + 1}</span>
-                  <div>
-                    <div className="font-medium text-sm">{u.name}</div>
-                    <div className="text-xs text-muted-foreground">{u.uploadCount} uploads</div>
+            {leaders.map((u, i) => {
+              const displayName = u.name && u.name.trim() && u.name !== "User" ? u.name : u.email?.split("@")[0] || "User";
+              return (
+                <div key={u.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-muted transition">
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs font-bold text-muted-foreground w-5">#{i + 1}</span>
+                    <div>
+                      <div className="font-medium text-sm">{displayName}</div>
+                      <div className="text-xs text-muted-foreground">{u.uploadCount} uploads</div>
+                    </div>
                   </div>
+                  <span className="text-xs text-primary font-semibold">{u.uploadCount} 📄</span>
                 </div>
-                <span className="text-xs text-primary font-semibold">{u.uploadCount} 📄</span>
-              </div>
-            ))}
+              );
+            })}
           </CardContent>
         </Card>
       </div>
