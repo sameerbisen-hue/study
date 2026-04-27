@@ -1,15 +1,18 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Flag, Trash2, CheckCircle2, X, AlertTriangle } from "lucide-react";
+import { Flag, Trash2, CheckCircle2, X, AlertTriangle, Search } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { useStore, select, reports, materials, users } from "@/services/store";
 import { reportReasonLabel } from "@/services/labels";
 import { format } from "date-fns";
 import { toast } from "@/hooks/use-toast";
 
 export default function ReportManagement() {
+  const [searchQuery, setSearchQuery] = useState("");
+  
   useEffect(() => {
     reports.loadAll();
     materials.loadAll();
@@ -19,6 +22,16 @@ export default function ReportManagement() {
   const reps = useStore(select.reports);
   useStore(select.materials);
 
+  const filteredReports = reps.filter((r) => {
+    const query = searchQuery.toLowerCase();
+    return (
+      r.materialTitle.toLowerCase().includes(query) ||
+      r.reporterName.toLowerCase().includes(query) ||
+      reportReasonLabel[r.reason].toLowerCase().includes(query) ||
+      r.status.toLowerCase().includes(query)
+    );
+  });
+
   return (
     <div className="space-y-6">
       <div className="space-y-1">
@@ -26,11 +39,23 @@ export default function ReportManagement() {
         <p className="text-muted-foreground">Review and act on user-submitted reports.</p>
       </div>
 
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="Search by material title, reporter, reason, or status..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="pl-9"
+        />
+      </div>
+
       <div className="space-y-3">
-        {reps.length === 0 && (
-          <Card className="border-border/60"><CardContent className="p-8 text-center text-muted-foreground">No reports yet.</CardContent></Card>
+        {filteredReports.length === 0 && (
+          <Card className="border-border/60"><CardContent className="p-8 text-center text-muted-foreground">
+            {searchQuery ? "No reports match your search." : "No reports yet."}
+          </CardContent></Card>
         )}
-        {reps.map((r) => {
+        {filteredReports.map((r) => {
           const mat = materials.get(r.materialId);
           return (
             <Card key={r.id} className="border-border/60">

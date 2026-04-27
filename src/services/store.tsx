@@ -479,7 +479,12 @@ export const materials = {
       .select("*")
       .order("uploaded_at", { ascending: false });
 
-    if (!error && data) {
+    if (error) {
+      console.error("Failed to load materials:", error);
+      return;
+    }
+
+    if (data) {
       patchState({ materials: data.map(rowToMaterial) });
     }
   },
@@ -816,7 +821,12 @@ export const reports = {
       .select("*")
       .order("created_at", { ascending: false });
 
-    if (!error && data) {
+    if (error) {
+      console.error("Failed to load reports:", error);
+      return;
+    }
+
+    if (data) {
       patchState({
         reports: data.map((r) => ({
           id: r.id as string,
@@ -865,7 +875,12 @@ export const users = {
       .select("*")
       .order("total_upvotes", { ascending: false });
 
-    if (!error && data) {
+    if (error) {
+      console.error("Failed to load users:", error);
+      return;
+    }
+
+    if (data) {
       patchState({ users: data.map(rowToUser) });
     }
   },

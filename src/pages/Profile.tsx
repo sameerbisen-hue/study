@@ -10,7 +10,15 @@ export default function Profile() {
   useEffect(() => { materials.loadAll(); }, []);
   const me = useStore(select.currentUser);
   useStore(select.materials);
-  if (!me) return null;
+  
+  if (!me) {
+    return (
+      <div className="min-h-[40vh] flex items-center justify-center">
+        <div className="h-8 w-8 rounded-full border-4 border-primary border-t-transparent animate-spin" />
+      </div>
+    );
+  }
+  
   const myUploads = materials.list().filter((m) => m.uploaderId === me.id);
 
   return (
@@ -21,12 +29,12 @@ export default function Profile() {
           <div className="flex items-end gap-4">
             <Avatar className="h-24 w-24 border-4 border-background">
               <AvatarFallback className="bg-gradient-primary text-primary-foreground text-2xl">
-                {me.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
+                {(me.name || "User").split(" ").map((n) => n[0]).join("").slice(0, 2)}
               </AvatarFallback>
             </Avatar>
             <div className="pb-2">
-              <h1 className="text-2xl font-bold">{me.name}</h1>
-              <p className="text-sm text-muted-foreground">@{me.username} · {me.semester}</p>
+              <h1 className="text-2xl font-bold">{me.name || "User"}</h1>
+              <p className="text-sm text-muted-foreground">@{me.username || "user"} · {me.semester || "—"}</p>
             </div>
           </div>
           {me.bio && <p className="text-sm">{me.bio}</p>}

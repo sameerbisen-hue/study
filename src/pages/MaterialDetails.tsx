@@ -119,11 +119,11 @@ export default function MaterialDetails() {
               <div className="flex items-center gap-3 pt-2">
                 <Avatar className="h-9 w-9">
                   <AvatarFallback className="bg-accent text-accent-foreground text-xs">
-                    {material.uploaderName.split(" ").map((n) => n[0]).join("").slice(0, 2)}
+                    {(material.uploaderName || "User").split(" ").map((n) => n[0]).join("").slice(0, 2)}
                   </AvatarFallback>
                 </Avatar>
                 <div className="text-sm">
-                  <div className="font-medium">{material.uploaderName}</div>
+                  <div className="font-medium">{material.uploaderName || "User"}</div>
                   <div className="text-xs text-muted-foreground">
                     Uploaded {formatDistanceToNow(new Date(material.uploadedAt), { addSuffix: true })} · {material.fileSize}
                   </div>
@@ -204,11 +204,11 @@ export default function MaterialDetails() {
                 list.map((r) => (
                   <div key={r.id} className="flex gap-3 border-b last:border-0 pb-4 last:pb-0">
                     <Avatar className="h-9 w-9">
-                      <AvatarFallback className="bg-secondary text-xs">{r.userName.split(" ").map((n) => n[0]).join("")}</AvatarFallback>
+                      <AvatarFallback className="bg-secondary text-xs">{(r.userName || "User").split(" ").map((n) => n[0]).join("")}</AvatarFallback>
                     </Avatar>
                     <div className="space-y-1 flex-1">
                       <div className="flex items-center justify-between">
-                        <div className="font-medium text-sm">{r.userName}</div>
+                        <div className="font-medium text-sm">{r.userName || "User"}</div>
                         <div className="text-xs text-muted-foreground">{formatDistanceToNow(new Date(r.createdAt), { addSuffix: true })}</div>
                       </div>
                       <div className="flex">

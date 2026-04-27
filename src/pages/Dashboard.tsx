@@ -36,7 +36,7 @@ export default function Dashboard() {
         <div className="absolute -top-20 -right-20 h-64 w-64 rounded-full bg-white/10 blur-3xl" />
         <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="space-y-2">
-            <p className="text-sm text-primary-foreground/80">Welcome back, {me.name.split(" ")[0]} 👋</p>
+            <p className="text-sm text-primary-foreground/80">Welcome back, {(me.name || "User").split(" ")[0]} 👋</p>
             <h1 className="text-2xl md:text-3xl font-bold">Ready to share what you've learned today?</h1>
           </div>
           <Button asChild size="lg" variant="secondary" className="shadow-md">
