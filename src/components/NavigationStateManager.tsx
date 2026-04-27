@@ -6,13 +6,12 @@ interface NavigationStateManagerProps {
 }
 
 export function NavigationStateManager({ children }: NavigationStateManagerProps) {
-  const [isReady, setIsReady] = useState(false);
+  const [isReady, setIsReady] = useState(true); // Start as ready - don't block
   const lastVisibilityRef = useRef(!document.hidden);
   const checkInProgressRef = useRef(false);
   const mountedRef = useRef(true);
 
   useEffect(() => {
-    let readyTimeoutId: NodeJS.Timeout;
     let visibilityTimeoutId: NodeJS.Timeout;
 
     const safeSetReady = (value: boolean) => {
@@ -50,23 +49,21 @@ export function NavigationStateManager({ children }: NavigationStateManagerProps
       checkInProgressRef.current = true;
 
       try {
-        // Quick session check - just verify we can talk to Supabase
-        // Don't block page load with complex auth checks
-        const { data: { session } } = await supabase.auth.getSession();
+        // Fire-and-forget auth check - don't block the app
+        const result = await Promise.race([
+          supabase.auth.getSession(),
+          new Promise<any>((_, reject) => setTimeout(() => reject(new Error('Timeout')), 1500))
+        ]);
 
-        if (session) {
+        if (result?.data?.session) {
           console.log("Session found, user is authenticated");
         } else {
           console.log("No session, user is not authenticated");
         }
 
-        // Always become ready after first check - auth state will update via listener
-        safeSetReady(true);
-
       } catch (error) {
         console.error("Auth check error:", error);
-        // Even on error, show the app - better UX than stuck loading
-        safeSetReady(true);
+        // Don't block the app even on error
       } finally {
         checkInProgressRef.current = false;
       }
@@ -75,38 +72,16 @@ export function NavigationStateManager({ children }: NavigationStateManagerProps
     // Add event listeners
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
-    // Initial check - run once on mount only
+    // Run auth check in background - don't block
     checkAndRestoreAuth();
-
-    // Force ready after 5 seconds max (failsafe) - use ref to avoid stale closure
-    readyTimeoutId = setTimeout(() => {
-      if (mountedRef.current) {
-        console.warn("NavigationStateManager: Forcing ready state after timeout");
-        safeSetReady(true);
-        checkInProgressRef.current = false;
-      }
-    }, 5000);
 
     // Cleanup
     return () => {
       mountedRef.current = false;
       document.removeEventListener('visibilitychange', handleVisibilityChange);
-      if (readyTimeoutId) clearTimeout(readyTimeoutId);
       if (visibilityTimeoutId) clearTimeout(visibilityTimeoutId);
     };
   }, []);
-
-  // Show loading state while checking authentication
-  if (!isReady) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-center space-y-4">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-          <p className="text-sm text-muted-foreground">Loading...</p>
-        </div>
-      </div>
-    );
-  }
 
   return <>{children}</>;
 }

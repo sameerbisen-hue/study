@@ -36,7 +36,7 @@ const defaultState: StoreState = {
   reviews: [],
   reports: [],
   bookmarks: [],
-  loading: true,
+  loading: false,
 };
 
 let _setState: React.Dispatch<React.SetStateAction<StoreState>> = () => {};
@@ -83,7 +83,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       try {
         const { data: { session } } = await withTimeout(
           supabase.auth.getSession(),
-          3000,
+          2000,
           "Timed out while checking your session"
         );
         if (!isMounted) return;
@@ -95,7 +95,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
         const { data: { user }, error } = await withTimeout(
           supabase.auth.getUser(),
-          3000,
+          2000,
           "Timed out while validating your user"
         );
         if (!isMounted) return;
@@ -120,7 +120,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
               ? user.user_metadata.name
               : null,
           }),
-          5000,
+          3000,
           "Timed out while loading your profile"
         );
 
@@ -177,12 +177,6 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
       // Prevent multiple concurrent syncs
       if (_state.loading) return;
-
-      // Only set loading to true if we don't have a user yet
-      // This prevents blocking UI on page revisit when user is already authenticated
-      if (!_state.currentUser) {
-        patchState({ loading: true });
-      }
 
       try {
         await syncAuthState();
@@ -403,22 +397,30 @@ export const auth = {
     message?: string;
   }> => {
     try {
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: { data: { name } },
-      });
+      const { data, error } = await withTimeout(
+        supabase.auth.signUp({
+          email,
+          password,
+          options: { data: { name } },
+        }),
+        10000,
+        "Sign up request timed out. Please check your connection and try again."
+      );
       if (error) return { ok: false, error: error.message };
 
       if (!data.user) {
         return { ok: true, nextStep: "login" };
       }
 
-      const profile = await ensureProfile({
-        userId: data.user.id,
-        name,
-        email: data.user.email ?? email,
-      });
+      const profile = await withTimeout(
+        ensureProfile({
+          userId: data.user.id,
+          name,
+          email: data.user.email ?? email,
+        }),
+        8000,
+        "Profile setup timed out. Please try signing in again."
+      );
 
       if (profile && data.session) {
         patchState({ currentUser: profile, loading: false });
@@ -458,21 +460,29 @@ export const auth = {
     password: string
   ): Promise<{ ok: boolean; error?: string }> => {
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+      const { data, error } = await withTimeout(
+        supabase.auth.signInWithPassword({
+          email,
+          password,
+        }),
+        10000,
+        "Sign in request timed out. Please check your connection and try again."
+      );
       if (error) return { ok: false, error: error.message };
 
       if (data.user) {
-        const profile = await ensureProfile({
-          userId: data.user.id,
-          email: data.user.email ?? email,
-          name:
-            typeof data.user.user_metadata?.name === "string"
-              ? data.user.user_metadata.name
-              : null,
-        });
+        const profile = await withTimeout(
+          ensureProfile({
+            userId: data.user.id,
+            email: data.user.email ?? email,
+            name:
+              typeof data.user.user_metadata?.name === "string"
+                ? data.user.user_metadata.name
+                : null,
+          }),
+          8000,
+          "Profile loading timed out. Please try signing in again."
+        );
 
         if (!profile) {
           return {
@@ -639,6 +649,9 @@ export const materials = {
     }
 
     patchState({ currentUser: { ...me, uploadCount: me.uploadCount + 1 } });
+    
+    // Refresh users list to update leaderboard data
+    await users.loadAll();
 
     const mat = rowToMaterial(row);
     patchState({ materials: [mat, ..._state.materials] });
@@ -658,6 +671,7 @@ export const materials = {
       ? mat.upvotedBy.filter((x) => x !== uid)
       : [...mat.upvotedBy, uid];
     const newUpvotes = has ? mat.upvotes - 1 : mat.upvotes + 1;
+    const upvoteDelta = has ? -1 : 1;
 
     // Optimistic update
     patchState({
@@ -680,6 +694,29 @@ export const materials = {
           m.id === id ? mat : m
         ),
       });
+      return;
+    }
+
+    // Update uploader's total_upvotes in profiles table
+    if (mat.uploaderId) {
+      const uploader = _state.users.find(u => u.id === mat.uploaderId);
+      if (uploader) {
+        const newTotalUpvotes = Math.max(0, uploader.totalUpvotes + upvoteDelta);
+        await supabase
+          .from("profiles")
+          .update({ total_upvotes: newTotalUpvotes })
+          .eq("id", mat.uploaderId);
+        
+        // Update local state for uploader
+        patchState({
+          users: _state.users.map(u => 
+            u.id === mat.uploaderId ? { ...u, totalUpvotes: newTotalUpvotes } : u
+          ),
+          currentUser: _state.currentUser?.id === mat.uploaderId 
+            ? { ..._state.currentUser, totalUpvotes: newTotalUpvotes }
+            : _state.currentUser,
+        });
+      }
     }
   },
 
@@ -847,6 +884,9 @@ export const reviews = {
       reviews: [newReview, ..._state.reviews],
       currentUser: { ...me, reviewCount: me.reviewCount + 1 },
     });
+    
+    // Refresh users list to update leaderboard data
+    await users.loadAll();
   },
 };
 

@@ -10,23 +10,17 @@ import { auth, useStore, select } from "@/services/store";
 
 export default function AppLayout() {
   const me = useStore(select.currentUser);
-  const loading = useStore((s) => s.loading);
   const navigate = useNavigate();
   const [dark, setDark] = useState(() => document.documentElement.classList.contains("dark"));
   const [q, setQ] = useState("");
 
   useEffect(() => {
-    document.documentElement.classList.toggle("dark", dark);
+    if (dark) {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+    }
   }, [dark]);
-
-  // While auth state is being resolved, show nothing (avoid flash redirect)
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="h-8 w-8 rounded-full border-4 border-primary border-t-transparent animate-spin" />
-      </div>
-    );
-  }
 
   if (!me) return <Navigate to="/login" replace />;
 
