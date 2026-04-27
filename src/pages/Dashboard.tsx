@@ -42,7 +42,7 @@ export default function Dashboard() {
   const topUpvoted = materials.topUpvoted();
   const leaders = [...usersList]
     .filter((u) => u.role === "student")
-    .sort((a, b) => b.totalUpvotes - a.totalUpvotes)
+    .sort((a, b) => b.uploadCount - a.uploadCount)
     .slice(0, 5);
 
   if (!me) return null;
@@ -120,7 +120,7 @@ export default function Dashboard() {
 
         <Card className="border-border/60">
           <CardHeader className="flex-row items-center justify-between space-y-0">
-            <CardTitle className="text-base flex items-center gap-2"><Trophy className="h-4 w-4 text-warning" /> Leaderboard</CardTitle>
+            <CardTitle className="text-base flex items-center gap-2"><Trophy className="h-4 w-4 text-warning" /> Top Uploaders</CardTitle>
             <Button asChild variant="ghost" size="sm"><Link to="/leaderboard">Full <ArrowRight className="h-3 w-3" /></Link></Button>
           </CardHeader>
           <CardContent className="space-y-2">
@@ -133,7 +133,7 @@ export default function Dashboard() {
                     <div className="text-xs text-muted-foreground">{u.uploadCount} uploads</div>
                   </div>
                 </div>
-                <span className="text-xs text-primary font-semibold">{u.totalUpvotes} ▲</span>
+                <span className="text-xs text-primary font-semibold">{u.uploadCount} 📄</span>
               </div>
             ))}
           </CardContent>
