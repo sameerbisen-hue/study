@@ -15,6 +15,5 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     persistSession: true,
     autoRefreshToken: true,
     storageKey: 'studyshare-auth',
-    detectSessionInUrl: false,
   },
 });

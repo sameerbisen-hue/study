@@ -599,9 +599,9 @@ export const materials = {
     };
 
     const contentType = data.file.type || mimeTypes[data.fileType] || 'application/octet-stream';
-    console.log("Uploading with content type:", contentType, "File type:", data.fileType);
+    console.log("Uploading with content type:", contentType, "File type:", data.fileType, "File size:", data.file.size);
 
-    // Add timeout for storage upload (2 minutes)
+    // Add timeout for storage upload (1 minute for mobile)
     const uploadPromise = supabase.storage
       .from("materials")
       .upload(storagePath, data.file, {
@@ -610,10 +610,18 @@ export const materials = {
       });
 
     const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error("Upload timed out. Please check your connection and try again.")), 120000);
+      setTimeout(() => reject(new Error("Upload timed out. Please try with a smaller file or better connection.")), 60000);
     });
 
-    const { error: storageError, data: storageData } = await Promise.race([uploadPromise, timeoutPromise]) as any;
+    let storageResult;
+    try {
+      storageResult = await Promise.race([uploadPromise, timeoutPromise]) as any;
+    } catch (timeoutError) {
+      console.error("Upload timeout:", timeoutError);
+      throw timeoutError;
+    }
+
+    const { error: storageError, data: storageData } = storageResult;
 
     if (storageError) {
       console.error("Storage upload error:", storageError);
@@ -902,6 +910,8 @@ export const reviews = {
 
     if (profileError) {
       console.error("Failed to update review count in profile:", profileError);
+    } else {
+      console.log("Review count updated successfully in database");
     }
 
     patchState({
@@ -910,6 +920,7 @@ export const reviews = {
     });
     
     // Refresh users list and current user profile to update leaderboard data
+    console.log("Refreshing users list for leaderboard update");
     await users.loadAll();
     await auth.refreshProfile();
   },
